@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 #-------------------------------------------------------------------------------------------------------------------------------
-## dedup.sh MANIFEST, USAGE DOCS, SET CHECKS
+## merge_gvcfs.sh MANIFEST, USAGE DOCS, SET CHECKS
 #-------------------------------------------------------------------------------------------------------------------------------
 
 read -r -d '' MANIFEST << MANIFEST
@@ -26,22 +26,24 @@ read -r -d '' DOCS << DOCS
 
 #############################################################################
 #
-# Deduplicate BAMs with Picard. Part of the MayomicsVC Workflow.
+# Gathers/Aggregates scattered per-sample gvcf files and creates an index 
 # 
 #############################################################################
 
  USAGE:
- dedup.sh          -s           <sample_name> 
-                   -b           <aligned_sorted_merged.bam>
-                   -S           </path/to/gatk/executable> 
-                   -J           </path/to/java8_executable>
-                   -e           <java_vm_options>
-                   -F           </path/to/shared_functions.sh>
-                   -d           turn on debug mode
+ merge_gvcfs.sh       -s           <sample_name>
+                      -b           <chr1.vcf[,chr2.vcf,...]>
+                      -S           </path/to/gatk/executable>
+                      -J           </path/to/java8_executable>
+                      -e           <java_vm_options>
+                      -F           </path/to/shared_functions.sh>
+                      -d           turn on debug mode
 
  EXAMPLES:
- dedup.sh -h
- dedup.sh -s sample -b aligned_sorted_merged.bam -S /path/to/gatk/executable -J /path/to/java8_executable -e "'-Xms2G -Xmx8G'" -F /path/to/shared_functions.sh -d
+ merge_gvcfs.sh -h
+ merge_gvcfs.sh -s sample -b chr1.vcf,chr2.vcf,chr3.vcf -S /path/to/gatk/executable -J /path/to/java8_executable -e "'-Xms2G -Xmx8G'" -F /path/to/shared_functions.sh -d
+
+ NOTE: In order for getops to read in a string arguments for -e (java_vm_options), the argument needs to be quoted with a double quote (") followed by a single quote ('). See the example above.
 
 #############################################################################
 
@@ -56,7 +58,7 @@ set -o errexit
 set -o pipefail
 set -o nounset
 
-SCRIPT_NAME=dedup.sh
+SCRIPT_NAME=merge_gvcfs.sh
 SGE_JOB_ID=TBD  # placeholder until we parse job ID
 SGE_TASK_ID=TBD  # placeholder until we parse task ID
 
@@ -101,18 +103,18 @@ do
                         exit 0
                         ;;
                 s )  # Sample name
-                        SAMPLE=${OPTARG}
-                        checkArg
-                        ;;
-                b )  # Full path to the input BAM
-                        INPUTBAM=${OPTARG}
+                         SAMPLE=${OPTARG}
+                         checkArg
+                         ;;
+                b )  # Full path to the input gvcfs or list of gvcfs
+                        INPUTGVCFS=${OPTARG}
                         checkArg
                         ;;
                 S )  # Full path to gatk executable
                         GATKEXE=${OPTARG}
                         checkArg
                         ;;
-                J ) # Path to JAVA8 exectable. The variable needs to be small letters so as not to explicitly change the user's $PATH variabl
+                J ) # Path to JAVA8 exectable. The variable needs to be small letters so as not to explicitly change the user's $PATH variable
                         java=${OPTARG}
                         checkArg
                         ;;
@@ -128,7 +130,7 @@ do
                         echo -e "\nDebug mode is ON.\n"
                         set -x
                         ;;
-               \? )  # Check for unsupported flag, print usage and exit.
+                \? )  # Check for unsupported flag, print usage and exit.
                         echo -e "\nInvalid option: -${OPTARG}\n\n${DOCS}\n"
                         exit 1
                         ;;
@@ -136,7 +138,7 @@ do
                         echo -e "\nOption -${OPTARG} requires an argument.\n\n${DOCS}\n"
                         exit 1
                         ;;
-        esac
+                esac
 done
 
 
@@ -155,13 +157,24 @@ source ${SHARED_FUNCTIONS}
 checkVar "${SAMPLE+x}" "Missing sample name option: -s" $LINENO
 
 ## Create log for JOB_ID/script
-ERRLOG=${SAMPLE}.dedup.${SGE_JOB_ID}.log
+ERRLOG=${SAMPLE}.merge_gvcfs.${SGE_JOB_ID}.log
 truncate -s 0 "${ERRLOG}"
-truncate -s 0 ${SAMPLE}.dedup_picard.log
+TOOL_LOG=${SAMPLE}.merge_gvcfs_gatk.log
+truncate -s 0 ${TOOL_LOG}
 
 ## Write manifest to log
 echo "${MANIFEST}" >> "${ERRLOG}"
 
+## Check if input files, directories, and variables are non-zero
+checkVar "${INPUTGVCFS+x}" "Missing input gvcf option: -b" $LINENO
+for GVCF in $(echo ${INPUTGVCFS} | sed "s/,/ /g")
+do
+        checkFile ${GVCF} "Input variants file ${GVCF} is empty or does not exist." $LINENO
+        checkFile ${GVCF}.idx "Input variants index file ${GVCF}.idx is empty or does not exist." $LINENO
+done
+
+checkVar "${GATKEXE+x}" "Missing GATKEXE path option: -S" $LINENO
+checkFileExe ${GATKEXE} "REASON=GATK file ${GATKEXE} is not an executable or does not exist." $LINENO
 
 ## Check java8 path and options 
 checkVar "${java+x}" "Missing JAVA path option: -J" $LINENO
@@ -169,65 +182,36 @@ checkFileExe ${java} "REASON=JAVA file ${java} is not executable or does not exi
 checkVar "${JAVA_OPTS_STRING+x}" "Missing specification of JAVA memory options: -e" $LINENO
 
 
-## Check if input files, directories, and variables are non-zero
-checkVar "${INPUTBAM+x}" "Missing input BAM option: -b" $LINENO
-checkFile ${INPUTBAM} "Input sorted BAM file ${INPUTBAM} is empty or does not exist." $LINENO
-checkFile ${INPUTBAM}.bai "Input sorted BAM index file ${INPUTBAM}.bai is empty or does not exist." $LINENO
-
-checkVar "${GATKEXE+x}" "Missing GATK path option: -S" $LINENO
-checkFileExe ${GATKEXE} "REASON=GATK file ${GATKEXE} is not executable or does not exist." $LINENO
-
-
-
 
 #-------------------------------------------------------------------------------------------------------------------------------
 ## FILENAME PARSING
 #-------------------------------------------------------------------------------------------------------------------------------
 
-## Defining file names
-OUT=${SAMPLE}.bam
-DEDUPMETRICS=${SAMPLE}.dedup_metrics.txt
-TOOL_LOG=${SAMPLE}.dedup_picard.log
-
 JAVA_OPTS_PARSED=`sed -e "s/'//g" <<< ${JAVA_OPTS_STRING}`
+
+## Defining file names
+GVCFS=$( echo ${INPUTGVCFS} | sed "s/,/ --INPUT /g" | tr "\n" " " )
+OUTGVCF=${SAMPLE}.g.vcf
 
 
 
 
 #-------------------------------------------------------------------------------------------------------------------------------
-## DEDUPLICATION
+## Merge multiple gVCF files from a scatter operation into a single gVCF file. 
 #-------------------------------------------------------------------------------------------------------------------------------
 
 ## Record start time
-logInfo "[PICARD] Deduplicating BAM."
+logInfo "[GATKEXE] Merging gvcf variants files across a sample"
 
+## gatk/picard MergeVcfs command
 TRAP_LINE=$(($LINENO + 1))
-trap 'logError " $0 stopped at line ${TRAP_LINE}. Picard Deduplication error. " ' INT TERM EXIT
-${GATKEXE} --java-options "${JAVA_OPTS_PARSED}" MarkDuplicates --INPUT ${INPUTBAM} --METRICS_FILE ${DEDUPMETRICS} --OUTPUT ${OUT} >> ${TOOL_LOG}  2>&1
+trap 'logError " $0 stopped at line ${TRAP_LINE}. MergeVcfs aggregation error. " ' INT TERM EXIT
+${GATKEXE} --java-options  "${JAVA_OPTS_PARSED}" MergeVcfs --INPUT ${GVCFS} --OUTPUT ${OUTGVCF} >> ${TOOL_LOG} 2>&1 
 EXITCODE=$?
 trap - INT TERM EXIT
 
 checkExitcode ${EXITCODE} $LINENO
-logInfo "[PICARD] Deduplication Finished. Deduplicated BAM found at ${OUT}"
-
-
-
-
-#-------------------------------------------------------------------------------------------------------------------------------
-## BAM INDEXONG 
-#-------------------------------------------------------------------------------------------------------------------------------
-
-## Index BAM 
-logInfo "[PICARD] Indexing BAM..."
-
-TRAP_LINE=$(($LINENO + 1))
-trap 'logError " $0 stopped at line ${TRAP_LINE}. Picard BAM indexing error. " ' INT TERM EXIT
-${GATKEXE} --java-options  "${JAVA_OPTS_PARSED}" BuildBamIndex --INPUT ${OUT} --OUTPUT ${OUT}.bai >> ${TOOL_LOG} 2>&1
-EXITCODE=$?  # Capture exit code
-trap - INT TERM EXIT
-
-checkExitcode ${EXITCODE} $LINENO
-logInfo "[PICARD] Indexed BAM output."
+logInfo "[GATKEXE] Gathering of input GVCFs complete."
 
 
 
@@ -236,15 +220,12 @@ logInfo "[PICARD] Indexed BAM output."
 ## POST-PROCESSING
 #-------------------------------------------------------------------------------------------------------------------------------
 
-## Check for creation of output BAM and index. Open read permissions to the user group
-checkFile ${OUT} "Output deduplicated BAM file ${OUT} is empty." $LINENO
-checkFile ${OUT}.bai "Output deduplicated BAM index file ${OUT}.bai is empty." $LINENO
+## Check for creation of output gvcf and its index. Open read permissions to the user group
+checkFile ${OUTGVCF} "Output variants file ${OUTGVCF} is empty." $LINENO
+checkFile ${OUTGVCF}.idx "Output variants index file ${OUTGVCF}.idx is empty." $LINENO
 
-chmod g+r ${OUT}
-chmod g+r ${OUT}.bai
-chmod g+r ${DEDUPMETRICS}
-
-
+chmod g+r ${OUTGVCF}
+chmod g+r ${OUTGVCF}.idx
 
 
 #-------------------------------------------------------------------------------------------------------------------------------
