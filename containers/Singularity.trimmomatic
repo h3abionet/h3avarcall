@@ -2,7 +2,7 @@ Bootstrap: docker
 From: ubuntu:16.04
 
 %labels
-    Maintainer Phelelani.Mpangase@wits.ac.za
+    Maintainer Phelelani.Mpangase@wits.ac.za (h3abionet)
 
 %post
 ## Updates and essentials

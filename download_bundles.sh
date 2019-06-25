@@ -1,6 +1,6 @@
 #!/bin/bash
 
-curl --list-only ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/b37/ > b37_files.txt
+# curl --list-only ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/b37/ > b37_files.txt
 
 while read file
 do
