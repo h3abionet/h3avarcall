@@ -6,8 +6,8 @@
 params.data          = "/home/phelelani/h3abionet/data"
 params.out           = "/home/phelelani/h3abionet/results"
 params.extension     = "fastq.gz"
-//params.mode          = "do.alignment"
-params.mode          = "do.qc"
+params.mode          = "do.alignment"
+//params.mode          = "do.qc"
 params.trim          = "ILLUMINACLIP:TruSeq3-PE-2.fa:2:30:10:8:true TRAILING:28 MINLEN:40"
 params.resources     = "/global/blast/gatk-bundle/b37"
 
@@ -31,9 +31,27 @@ switch (params.mode) {
     case['do.GetContainers']:
         println "\nDownloading Singularity containers."
         
-        // process run_GetContainers {
+        base = "shub://phelelani/nf-rnaSeqMetagen:"
+        shub_images = Channel.from( ["${base}gatk", "${base}bwa", "${base}trimmomatic", "${base}fastqc"] )
         
-        // }
+        process run_DownloadContainers {
+            cpus 1
+            memory '2 GB'
+            time '2h'
+            scratch '$HOME/tmp'
+            tag { "Downloading: $link" }
+            publishDir "$baseDir/containers", mode: 'copy', overwrite: true, pattern: "*.simg"
+            
+            input:
+            each link from shub_images
+            
+            output:
+            file("*.simg") into containers
+        
+            """
+            singularity pull ${link}
+            """
+        }  
         break
         // --------------------
         
