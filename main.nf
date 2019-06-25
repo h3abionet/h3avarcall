@@ -31,7 +31,7 @@ switch (params.mode) {
     case['do.GetContainers']:
         println "\nDownloading Singularity containers."
         
-        base = "shub://phelelani/nf-rnaSeqMetagen:"
+        base = "shub://h3abionet/h3avarcall:"
         shub_images = Channel.from( ["${base}gatk", "${base}bwa", "${base}trimmomatic", "${base}fastqc"] )
         
         process run_DownloadContainers {
@@ -58,9 +58,20 @@ switch (params.mode) {
     case['do.GenomeIndexing']:
         println "\nDownloading reference genome and indexing"
 
-        // process run_GenomeIndexind {            
+        process run_GenomeIndexind {      
+            cpus 6
+            memory '5 GB'
+            time '2h'
+            scratch '$HOME/tmp'
+            tag { sample }
+            publishDir "$baseDir/resources", mode: 'copy', overwrite: false
+            
+            output:
+            file("*.gz") into resources
 
-        // }
+            shell:
+            template 'download_bundles.sh'
+        }
         break
         // --------------------
 
@@ -194,30 +205,30 @@ switch (params.mode) {
             """
         }
         
-        // process run_RecalibrateBAM {
-        //     cpus 6
-        //     memory '20 GB'
-        //     time '2h'
-        //     scratch '$HOME/tmp'
-        //     tag { sample }
-        //     publishDir "$out_dir/${sample}", mode: 'copy', overwrite: false
+        process run_RecalibrateBAM {
+            cpus 6
+            memory '20 GB'
+            time '2h'
+            scratch '$HOME/tmp'
+            tag { sample }
+            publishDir "$out_dir/${sample}", mode: 'copy', overwrite: false
             
-        //     input:
-        //     set sample, file("${sample}*") from recalibration_results
+            input:
+            set sample, file("${sample}*") from recalibration_results
             
-        //     output:
+            output:
+            set sample, file("${sample}*") into recalibrated_results
             
-            
-        //     """
-        //     gatk --java-options -Xmx10g ApplyBQSR \
-        //          --input ${bam_file} \
-        //          --output ${sample_id}.md.recal.bam \
-        //          --TMP_DIR ${params.gatk_tmp_dir} \
-        //          -R ${genome} \
-        //          --create-output-bam-index true \
-        //          --bqsr-recal-file ${recal_table_file}
-        //     """
-        // }
+            """
+            gatk --java-options -Xmx10g ApplyBQSR \
+                 --input ${sample}_md.bam \
+                 --output ${sample}_md.recal.bam \
+                 --TMP_DIR . \
+                 -R ${genome} \
+                 --create-output-bam-index true \
+                 --bqsr-recal-file ${sample}_recal.table
+            """
+        }
 
         break
         // --------------------
