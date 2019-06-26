@@ -35,23 +35,20 @@ nextflow run main.nf -profile slurm --mode do.GenomeIndexing
 
 
 
+## 2. QC & READ TRIMMING OF THE DATA
 
-
-### 4. Perform QC on data:
+### 2.1. Perform QC on data (optional):
 ```
 nextflow run main.nf -profile slurm --mode do.QC
 ```
 
-#### 4.1. Perform trimming of the data
+#### 2.3. Perform trimming of the data (optional):
 ```
 nextflow run main.nf -profile slurm --mode do.Trimming
 ```
 
-### 6. Perform alignment
+## 3. ALIGNMENT OF DATA
+### 3.1. Perform alignment
 ```
 nextflow run main.nf -profile slurm --mode do.Alignment
 ```
-
-
-
-
