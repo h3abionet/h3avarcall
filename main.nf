@@ -3,8 +3,8 @@
 // HELP MENU GOES HERE
 
 // PARAMETERS GO HERE! WILL BE IN A SEPARATE CONFIG FILE - JUST TESTINF FOR NOW!
-params.data          = "/home/phelelani/h3abionet/data"
-params.out           = "/home/phelelani/h3abionet/results"
+params.data          = "$baseDir/data"
+params.out           = "$baseDir/results"
 params.extension     = "fastq.gz"
 params.bundle        = "$baseDir/templates/b37_files_minimal.txt"
 params.mode          = "do.alignment" // DIFFENT MODES: do.GetContainers | do.GenomeIndexing | do.QC | do.Trimming | do.Alignment
@@ -91,6 +91,7 @@ switch (params.mode) {
             
             output:
             set sample, file("${sample}*.html") into qc_results
+            set sample, file(reads) into read_pairs
             
             """
             fastqc ${reads.get(0)} ${reads.get(1)} \
@@ -116,7 +117,7 @@ switch (params.mode) {
             set sample, file(reads) from read_pairs
             
             output:
-            set sample, file("${sample}*") into read_pairs
+            set sample, file("${sample}*{1,2}P*") into read_pairs
             
             """
             java -jar /opt/Trimmomatic-0.39/trimmomatic-0.39.jar PE \
