@@ -7,7 +7,7 @@ params.data          = "$baseDir/data"
 params.out           = "$baseDir/results"
 params.extension     = "fastq.gz"
 params.bundle        = "$baseDir/templates/b37_files_minimal.txt"
-params.mode          = "do.alignment" // DIFFENT MODES: do.GetContainers | do.GenomeIndexing | do.QC | do.Trimming | do.Alignment
+//params.mode          = "do.GetContainers" // DIFFENT MODES: do.GetContainers | do.GenomeIndexing | do.QC | do.Trimming | do.Alignment
 params.trim          = "ILLUMINACLIP:TruSeq3-PE-2.fa:2:30:10:8:true TRAILING:28 MINLEN:40"
 params.resources     = "/global/blast/gatk-bundle/b37"
 
@@ -19,7 +19,9 @@ trim_params          = params.trim
 resources            = file(params.resources, type: 'dir')
 
 genome               = file("${resources}/human_g1k_v37_decoy.fasta", type: 'file')
+dbsnp_sites          = file("${resources}/dbsnp_138.b37.vcf", type: 'file')
 b37_bundle           = file(params.bundle, type: 'file')
+
 out_dir.mkdir()
 
 // GET DATA
@@ -27,6 +29,7 @@ read_pairs = Channel.fromFilePairs("${data_dir}/*{R,read}[1,2]*.${ext}", type: '
 
 // START PROCESSING READS
 switch (params.mode) {
+    // Download the Singularity images required to execute this workflow! 
     case['do.GetContainers']:
         println "\nDownloading Singularity containers."
         
@@ -46,7 +49,7 @@ switch (params.mode) {
             
             output:
             file("*") into containers
-        
+            
             """
             singularity pull ${link}
             """
@@ -57,7 +60,7 @@ switch (params.mode) {
     case['do.GenomeIndexing']:
         println "\nDownloading reference genome and indexing"
 
-        process run_GenomeIndexing {      
+        process run_GenomeIndexing {
             cpus 1
             memory '5 GB'
             time '2h'
@@ -84,21 +87,21 @@ switch (params.mode) {
             time '2h'
             scratch '$HOME/tmp'
             tag { sample }
-            publishDir "$out_dir/${sample}", mode: 'copy', overwrite: false
+            publishDir "$out_dir/${sample}", mode: 'copy', overwrite: true
             
             input:
             set sample, file(reads) from read_pairs
             
             output:
             set sample, file("${sample}*.html") into qc_results
-            set sample, file(reads) into read_pairs
+            set sample, file(reads) into read_pairs_qcd
             
             """
             fastqc ${reads.get(0)} ${reads.get(1)} \
                 --threads 10 \
                 --noextract
             """
-        }     
+        }
         break
         // --------------------
 
@@ -111,20 +114,20 @@ switch (params.mode) {
             time '2h'
             scratch '$HOME/tmp'
             tag { sample }
-            publishDir "$out_dir/${sample}", mode: 'copy', overwrite: false
+            publishDir "$out_dir/${sample}", mode: 'copy', overwrite: true
             
             input:
             set sample, file(reads) from read_pairs
             
             output:
-            set sample, file("${sample}*{1,2}P*") into read_pairs
+            set sample, file("${sample}*{1,2}P*") into read_pairs_trimmed
             
             """
             java -jar /opt/Trimmomatic-0.39/trimmomatic-0.39.jar PE \
                 -threads 10 \
                 -trimlog trimlog_${sample}.log \
                 -basein ${reads.get(0)} \
-                -baseout ${sample}_clean \
+                -baseout ${sample}_trimmed.fastq.gz \
                 \$(sed 's|ILLUMINACLIP:|ILLUMINACLIP:/opt/Trimmomatic-0.39/adapters/|' <<< "${trim_params}")
             """
         }
@@ -255,9 +258,63 @@ switch (params.mode) {
         break
         // --------------------
 
-    // case['do.something']:
-    //     println "Performing something for all the samples"    
-    //     break
+    case['do.HaplotypeCaller']:
+        println "Performing something for all the samples"    
+        chromosomes = Channel.from ( 1..22 )
+
+        process run_HaplotypeCaller {
+            cpus 11
+            memory '50 GB'
+            time '2h'
+            scratch '$HOME/tmp'
+            tag { sample }
+            publishDir "$out_dir/${sample}", mode: 'copy', overwrite: false
+            
+            input:
+            set sample, file("*") from recalibrated_results
+            each chrom from chromosome
+
+            output:
+            set sample, file("*") into HaplotypeCaller_results
+            
+            """" 
+            gatk --java-options \"-Xmx4G\" HaplotypeCaller \
+                -R ${genome} \
+                -I ${sample}_md.recal.bam \
+                --emit-ref-confidence GVCF \
+                --dbsnp ${dbsnp_sites} \
+                --L ${chrom} \
+                --genotyping-mode DISCOVERY \
+                -A Coverage -A FisherStrand -A StrandOddsRatio -A MappingQualityRankSumTest -A QualByDepth -A RMSMappingQuality -A ReadPosRankSumTest \
+                -stand-call-conf 30 \
+                --sample-ploidy 2 \
+                -O ${sample}_${chrom}.g.vcf.gz
+            """
+        }
+
+        HaplotypeCaller_results.subscribe { println "$it" }
+
+        // process run_HaplotypeCaller {
+        //     cpus 11
+        //     memory '50 GB'
+        //     time '2h'
+        //     scratch '$HOME/tmp'
+        //     tag { sample }
+        //     publishDir "$out_dir/${sample}", mode: 'copy', overwrite: false
+            
+        //     input:
+        //     set sample, file("*") from recalibrated_results
+        //     each chrom from chromosome
+
+        //     output:
+        //     set sample, file("*") into HaplotypeCaller_results
+
+        // """
+        // """
+        // }
+
+        break
+
 }
 
 
