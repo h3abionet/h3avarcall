@@ -25,7 +25,7 @@ b37_bundle           = file(params.bundle, type: 'file')
 out_dir.mkdir()
 
 // GET DATA
-read_pairs = Channel.fromFilePairs("${data_dir}/*{R,read}[1,2]*.${ext}", type: 'file')
+read_pairs = Channel.fromFilePairs("${data_dir}/*{R,read}[1,2]*_001.${ext}", type: 'file')
 
 // START PROCESSING READS
 switch (params.mode) {
@@ -260,7 +260,7 @@ switch (params.mode) {
 
     case['do.HaplotypeCaller']:
         println "Performing something for all the samples"    
-        recalibrated_results = Channel.fromFilePairs("$out_dir/NIST7035_TAAGGCGA_L001/*_md.recal{.bam,.bai}", type: 'file', size: -1)
+        recalibrated_results = Channel.fromFilePairs("$out_dir/NIST7035_TAAGGCGA_L001/*_md.recal{.bam,.bai}", type: 'file', size: 2)
         chromosomes = Channel.from ( 1..22 )
 
         process run_HaplotypeCaller {
@@ -276,7 +276,7 @@ switch (params.mode) {
             each chrom from chromosomes
 
             output:
-            set val("chr_${chrom}"), file("*{.gz,.gz.tbi}") into HaplotypeCaller_results
+            set val("chr_${chrom}"), file("*{.gz,.gz.tbi}") into HaplotypeCaller_results mode flatten
             
             """
             gatk --java-options \"-Xmx4G\" HaplotypeCaller \
@@ -293,53 +293,82 @@ switch (params.mode) {
             """
         }
 
-        // HaplotypeCaller_results.subscribe { println "$it" }
-
-        // HaplotypeCaller_results.collectFile(sort: 'true') {
-        //     item -> [ "${item[0]}.txt", "${item[1]}" + '\n' ]
-        // }.set { sample_gvcf_list }
-
-       HaplotypeCaller_results
-           .groupTuple(by: 0, sort: 'true')
-           .set { HaplotypeCaller_per_chrom }
-//            .subscribe { println "$it" }
-
+        // 
+        HaplotypeCaller_results
+            .groupTuple(by: 0, sort: 'true')
+            .set { HaplotypeCaller_per_chrom }
+                
+        process run_CombineGVCF {
+            cpus 1
+            memory '10 GB'
+            time '2h'
+            scratch '$HOME/tmp'
+            tag { sample }
+            publishDir "$out_dir/GVCF", mode: 'copy', overwrite: false
+            
+            input:
+            set chrom, file(list) from HaplotypeCaller_per_chrom
+            
+            output:
+            set chrom, file("*") into combined_gvcf
+            
+        """
+        gatk --java-options \"-Xmx4G\" CombineGVCFs \
+            -R ${genome} \
+            -L ${chrom.substring(4,)} \
+            -V ${list.findAll { it =~ '.g.vcf.gz$' }.join(' -V ') } \
+            -O "${chrom}.g.vcf.gz" 
+        """            
+        }
         
-        // // sample_gvcf_list.subscribe {
-        // //     println "Contents of $it:\n"
-        // //     println "$it.text"
-        // // }
-
-        // process run_GenotypeGVCF {
-        //     cpus 1
-        //     memory '10 GB'
-        //     time '2h'
-        //     scratch '$HOME/tmp'
-        //     tag { sample }
-        //     publishDir "$out_dir/${sample}", mode: 'copy', overwrite: false
+        process run_GenotypeGVCF {
+            cpus 1
+            memory '10 GB'
+            time '2h'
+            scratch '$HOME/tmp'
+            tag { sample }
+            publishDir "$out_dir/GVCF", mode: 'copy', overwrite: false
             
-        //     input:
-        //     set chrom, file(list) from HaplotypeCaller_per_chrom
+            input:
+            set chrom, file(list) from combined_gvcf
             
-        //     output:
-        //     set chrom, file("*") into combined_gvcf
+            output:
+            set chrom, file("*") into geno_gvcf
 
-        // """
-        // gatk --java-options \"-Xmx4G\" GenotypeGVCFs \
-        //     -R ${genome} \
-        //     -L ${chrom.substring(2,)} \
-        //     -V ${list} \
-        //     -stand-call-conf 30 \
-        //     -A Coverage -A FisherStrand -A StrandOddsRatio -A MappingQualityRankSumTest -A QualByDepth -A RMSMappingQuality -A ReadPosRankSumTest \
-        //     -O "${chrom.substring(2,)}.g.vcf.gz" 
-        // """
-        // }
+        """
+        gatk --java-options \"-Xmx4G\" GenotypeGVCFs \
+            -R ${genome} \
+            -L ${chrom.substring(4,)} \
+            -V ${list.findAll { it =~ '.g.vcf.gz$' }.join() } \
+            -stand-call-conf 30 \
+            -A Coverage -A FisherStrand -A StrandOddsRatio -A MappingQualityRankSumTest -A QualByDepth -A RMSMappingQuality -A ReadPosRankSumTest \
+            -O "${chrom}_genotyped.g.vcf.gz" 
+        """
+        }
 
         break
+        // --------------------
 
+    // case['do.VQSR']:
+    //     println "Performing something for all the samples"
+
+    //     process run_SNP_VQSR {
+    //         cpus 1
+    //         memory '10 GB'
+    //         time '2h'
+    //         scratch '$HOME/tmp'
+    //         tag { sample }
+    //         publishDir "$out_dir/SNPs", mode: 'copy', overwrite: false
+            
+    //         input:
+    //         set chrom, file(list) from HaplotypeCaller_results
+            
+    //         output:
+    //         set chrom, file("*") into combined_gvcf
+            
+    //     """
+    //     gatk --java-options \"-Xmx4G\" GenotypeGVCFs \
+
+    //     """
+    //     }
 }
-
-//combined_gvcf.subscribe { println "$it" }
-
-// lftp -e 'mirror --use-pget-n=10 /bundle/hg19 .' -u gsapubftp-anonymous, ftp.broadinstitute.org
-// lftp -e 'pget -n20 ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/hg19/dbsnp_138.hg19.vcf.gz; bye'
