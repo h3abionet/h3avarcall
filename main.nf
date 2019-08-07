@@ -25,11 +25,12 @@ b37_bundle           = file(params.bundle, type: 'file')
 out_dir.mkdir()
 
 // GET DATA
-read_pairs = Channel.fromFilePairs("${data_dir}/*{R,read}[1,2]*_001.${ext}", type: 'file')
+read_pairs = Channel.fromFilePairs("${data_dir}/*{R,read}[1,2]*_001_trimmed.${ext}", type: 'file')
+//carry_over = Channel.create()
 
 // START PROCESSING READS
 switch (params.mode) {
-    // Download the Singularity images required to execute this workflow! 
+        // Download the Singularity images required to execute this workflow! 
     case['do.GetContainers']:
         println "\nDownloading Singularity containers."
         
@@ -75,7 +76,7 @@ switch (params.mode) {
             b37_list = "${b37_bundle}"
             template 'download_bundles.sh'
         }
-        break
+        // break
         // --------------------
 
     case['do.QC']:
@@ -102,7 +103,7 @@ switch (params.mode) {
                 --noextract
             """
         }
-        break
+        // break
         // --------------------
 
     case['do.Trimming']:
@@ -131,7 +132,7 @@ switch (params.mode) {
                 \$(sed 's|ILLUMINACLIP:|ILLUMINACLIP:/opt/Trimmomatic-0.39/adapters/|' <<< "${trim_params}")
             """
         }
-        break
+        // break
         // --------------------        
         
     case['do.Alignment']:
@@ -196,7 +197,7 @@ switch (params.mode) {
             set sample, file("*") from md_bam_results_crt
 
             output:
-            set sample, file("${sample}_recal.table") into recalibration_results
+            set sample, file("${sample}_recal.table") into recalibration_results mode flatten
 
             """
             gatk --java-options \"-Xmx4G\" BaseRecalibrator \
@@ -209,6 +210,16 @@ switch (params.mode) {
             """
         }
         
+        // ====================== COLLECTION =========================== 
+        md_bam_results_rb
+            .map { item -> [ item[0], item[1][0], item[1][1] ] }
+            .set { md_bam_results_rb_flat }
+        
+        recalibration_results.join(md_bam_results_rb_flat)
+            .map { item -> [ item[0], item[1..3] ] }
+            .set { recalibration_results_table }
+        // ====================== COLLECTION =========================== 
+
         process run_RecalibrateBAM {
             cpus 8
             memory '5 GB'
@@ -218,11 +229,10 @@ switch (params.mode) {
             publishDir "$out_dir/${sample}", mode: 'copy', overwrite: false
             
             input:
-            set sample, file("*") from recalibration_results
-            set sample, file("*") from md_bam_results_rb
+            set sample, file("*") from recalibration_results_table
 
             output:
-            set sample, file("${sample}_md.recal.{bam,bai}") into recalibrated_results_stats, recalibrated_results
+            set sample, file("${sample}_md.recal.{bam,bai}") into recalibrated_results_stats, recalibrated_results, carry_over
             
             """
             gatk --java-options \"-Xmx4G\" ApplyBQSR \
@@ -233,7 +243,7 @@ switch (params.mode) {
                  --bqsr-recal-file ${sample}_recal.table
             """
         }
-
+        
         process run_SamtoolsStats {
             cpus 11
             memory '50 GB'
@@ -254,13 +264,14 @@ switch (params.mode) {
                 ${sample}_md.recal.bam > ${sample}_md.recal.stats
             """
         }
+        
+    //     recal_stats.subscribe { println }
+    //     break
+    //     // --------------------
 
-        break
-        // --------------------
-
-    case['do.HaplotypeCaller']:
-        println "Performing something for all the samples"    
-        recalibrated_results = Channel.fromFilePairs("$out_dir/NIST7035_TAAGGCGA_L001/*_md.recal{.bam,.bai}", type: 'file', size: 2)
+    // case['do.HaplotypeCaller']:
+    //     println "Performing something for all the samples"    
+    //     recalibrated_results = Channel.fromFilePairs("$out_dir/**/*_md.recal{.bam,.bai}", type: 'file', size: 2)
         chromosomes = Channel.from ( 1..22 )
 
         process run_HaplotypeCaller {
@@ -293,10 +304,11 @@ switch (params.mode) {
             """
         }
 
-        // 
+        // ====================== COLLECTION =========================== 
         HaplotypeCaller_results
             .groupTuple(by: 0, sort: 'true')
             .set { HaplotypeCaller_per_chrom }
+        // ====================== COLLECTION =========================== 
                 
         process run_CombineGVCF {
             cpus 1
@@ -333,7 +345,7 @@ switch (params.mode) {
             set chrom, file(list) from combined_gvcf
             
             output:
-            set chrom, file("*") into geno_gvcf
+            file("*") into geno_gvcf
 
         """
         gatk --java-options \"-Xmx4G\" GenotypeGVCFs \
@@ -345,30 +357,39 @@ switch (params.mode) {
             -O "${chrom}_genotyped.g.vcf.gz" 
         """
         }
+        
+    //     geno_gvcf.subscribe { println "$it" }
 
-        break
-        // --------------------
+    // //     break
+    // //     // --------------------
 
-    // case['do.VQSR']:
-    //     println "Performing something for all the samples"
+    // // case['do.VQSRCaller']:
+    // //     println "Performing something for all the samples"        
+        
 
-    //     process run_SNP_VQSR {
-    //         cpus 1
-    //         memory '10 GB'
-    //         time '2h'
-    //         scratch '$HOME/tmp'
-    //         tag { sample }
-    //         publishDir "$out_dir/SNPs", mode: 'copy', overwrite: false
+    //     // process run_CombineGVCF {
+    //     //     cpus 1
+    //     //     memory '10 GB'
+    //     //     time '2h'
+    //     //     scratch '$HOME/tmp'
+    //     //     tag { sample }
+    //     //     publishDir "$out_dir/GVCF", mode: 'copy', overwrite: false
             
-    //         input:
-    //         set chrom, file(list) from HaplotypeCaller_results
+    //     //     input:
+    //     //     set chrom, file(chr_gvcf) from chr_gvcfs
             
-    //         output:
-    //         set chrom, file("*") into combined_gvcf
+    //     //     output:
+    //     //     set , file("*") into combined_gvcf
             
-    //     """
-    //     gatk --java-options \"-Xmx4G\" GenotypeGVCFs \
+    //     // """
+    //     // gatk --java-options \"-Xmx4G\" CombineGVCFs \
+    //     //     -R ${genome} \
+    //     //     -L ${chrom.substring(4,)} \
+    //     //     -V ${chr_gvcf.findAll { it =~ '.g.vcf.gz$' }.join(' -V ') } \
+    //     //     -O "${chrom}.g.vcf.gz" 
+    //     // """            
+    //     // }
+        
+    }//: return carry_over
 
-    //     """
-    //     }
-}
+//carry_over.subscribe { println "$it" }
