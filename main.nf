@@ -3,9 +3,8 @@
 // HELP MENU GOES HERE
 
 // PARAMETERS GO HERE! WILL BE IN A SEPARATE CONFIG FILE - JUST TESTINF FOR NOW!
-params.data          = "$baseDir/data"
+params.data          = "$baseDir/data/welcome_trust"
 params.out           = "$baseDir/results"
-params.extension     = "fastq.gz"
 params.bundle        = "$baseDir/templates/b37_files_minimal.txt"
 //params.mode          = "do.GetContainers" // DIFFENT MODES: do.GetContainers | do.GenomeIndexing | do.QC | do.Trimming | do.Alignment
 params.trim          = "ILLUMINACLIP:TruSeq3-PE-2.fa:2:30:10:8:true TRAILING:28 MINLEN:40"
@@ -14,19 +13,22 @@ params.resources     = "/global/blast/gatk-bundle/b37"
 // SET PARAMETERS
 data_dir             = file(params.data, type: 'dir')
 out_dir              = file(params.out, type: 'dir')
-ext                  = params.extension
 trim_params          = params.trim
 resources            = file(params.resources, type: 'dir')
 
 genome               = file("${resources}/human_g1k_v37_decoy.fasta", type: 'file')
 dbsnp_sites          = file("${resources}/dbsnp_138.b37.vcf", type: 'file')
+hapmap               = file("${resources}/hapmap_3.3.b37.vcf", type: 'file')
+omni                 = file("${resources}/1000G_omni2.5.b37.vcf", type: 'file')
+phase1_snps          = file("${resources}/1000G_phase1.snps.high_confidence.b37.vcf", type: 'file')
+golden_indels        = file("${resources}/Mills_and_1000G_gold_standard.indels.b37.vcf", type: 'file')
 b37_bundle           = file(params.bundle, type: 'file')
 
 out_dir.mkdir()
 
 // GET DATA
-read_pairs = Channel.fromFilePairs("${data_dir}/*{R,read}[1,2]*_001_trimmed.${ext}", type: 'file')
-//carry_over = Channel.create()
+//read_pairs = Channel.fromFilePairs("${data_dir}/*{R,read}[1,2]_*trimmed.${ext}", type: 'file')
+read_pairs = Channel.fromFilePairs("${data_dir}/*{R,read}[1,2]*.{fastq,fastq.gz,fastq.bz2,fq,fq.gz,fq.bz2}", type: 'file')
 
 // START PROCESSING READS
 switch (params.mode) {
@@ -41,9 +43,8 @@ switch (params.mode) {
             cpus 1
             memory '2 GB'
             time '2h'
-            scratch '$HOME/tmp'
             tag { "Downloading: $link" }
-            publishDir "$baseDir/containers", mode: 'copy', overwrite: true
+            publishDir "$baseDir/containers", mode: 'copy', overwrite: false
             
             input:
             each link from shub_images
@@ -62,10 +63,10 @@ switch (params.mode) {
         println "\nDownloading reference genome and indexing"
 
         process run_GenomeIndexing {
+            label 'bwa'
             cpus 1
             memory '5 GB'
             time '2h'
-            scratch '$HOME/tmp'
             tag { sample }
             publishDir "$baseDir/resources", mode: 'copy', overwrite: false
             
@@ -83,12 +84,12 @@ switch (params.mode) {
         println "\nPerforming QC for all the samples"
         
         process run_QualityChecks {
+            label 'fastqc'
             cpus 11
             memory '10 GB'
             time '2h'
-            scratch '$HOME/tmp'
             tag { sample }
-            publishDir "$out_dir/${sample}", mode: 'copy', overwrite: true
+            publishDir "$out_dir/${sample}", mode: 'copy', overwrite: false
             
             input:
             set sample, file(reads) from read_pairs
@@ -110,12 +111,12 @@ switch (params.mode) {
         println "Performing trimming for all the samples"
 
         process run_ReadTrimming {
+            label 'trimmomatic'
             cpus 11
             memory '50 GB'
             time '2h'
-            scratch '$HOME/tmp'
             tag { sample }
-            publishDir "$out_dir/${sample}", mode: 'copy', overwrite: true
+            publishDir "$out_dir/${sample}", mode: 'copy', overwrite: false
             
             input:
             set sample, file(reads) from read_pairs
@@ -139,12 +140,12 @@ switch (params.mode) {
         println "Performing alignment for all the samples"
 
         process run_ReadAlignment {
+            label 'bwa'
             cpus 11
             memory '50 GB'
             time '2h'
-            scratch '$HOME/tmp'
             tag { sample }
-            publishDir "$out_dir/${sample}", mode: 'copy', overwrite: false
+            // publishDir "$out_dir/${sample}", mode: 'copy', overwrite: false
             
             input:
             set sample, file(reads) from read_pairs
@@ -161,12 +162,12 @@ switch (params.mode) {
         }
 
         process run_MarkDuplicates {
+            label 'gatk'
             cpus 8
             memory '5 GB'
             time '2h'
-            scratch '$HOME/tmp'
             tag { sample }
-            publishDir "$out_dir/${sample}", mode: 'copy', overwrite: false
+            // publishDir "$out_dir/${sample}", mode: 'copy', overwrite: false
             
             input:
             set sample, file("*") from bam_results
@@ -186,12 +187,12 @@ switch (params.mode) {
         }
 
         process run_CreateRecalibrationTable {
-            cpus 8
+            label 'gatk'
+            cpus 1
             memory '5 GB'
             time '2h'
-            scratch '$HOME/tmp'
             tag { sample }
-            publishDir "$out_dir/${sample}", mode: 'copy', overwrite: false
+            // publishDir "$out_dir/${sample}", mode: 'copy', overwrite: false
             
             input:
             set sample, file("*") from md_bam_results_crt
@@ -221,10 +222,10 @@ switch (params.mode) {
         // ====================== COLLECTION =========================== 
 
         process run_RecalibrateBAM {
+            label 'gatk'
             cpus 8
             memory '5 GB'
             time '2h'
-            scratch '$HOME/tmp'
             tag { sample }
             publishDir "$out_dir/${sample}", mode: 'copy', overwrite: false
             
@@ -232,7 +233,7 @@ switch (params.mode) {
             set sample, file("*") from recalibration_results_table
 
             output:
-            set sample, file("${sample}_md.recal.{bam,bai}") into recalibrated_results_stats, recalibrated_results, carry_over
+            set sample, file("${sample}_md.recal.{bam,bai}") into recalibrated_results_stats, recalibrated_results
             
             """
             gatk --java-options \"-Xmx4G\" ApplyBQSR \
@@ -243,14 +244,14 @@ switch (params.mode) {
                  --bqsr-recal-file ${sample}_recal.table
             """
         }
-        
+
         process run_SamtoolsStats {
+            label 'bwa'
             cpus 11
             memory '50 GB'
             time '2h'
-            scratch '$HOME/tmp'
             tag { sample }
-            publishDir "$out_dir/${sample}", mode: 'copy', overwrite: false
+            publishDir "$out_dir/${sample}", mode: 'copy', overwrite: true
             
             input:
             set sample, file("*") from recalibrated_results_stats
@@ -275,12 +276,12 @@ switch (params.mode) {
         chromosomes = Channel.from ( 1..22 )
 
         process run_HaplotypeCaller {
+            label 'gatk'
             cpus 1
             memory '10 GB'
             time '5h'
-            scratch '$HOME/tmp'
             tag { sample }
-            publishDir "$out_dir/${sample}", mode: 'copy', overwrite: false
+            // publishDir "$out_dir/${sample}", mode: 'copy', overwrite: false
             
             input:
             set sample, file("*") from recalibrated_results
@@ -290,7 +291,7 @@ switch (params.mode) {
             set val("chr_${chrom}"), file("*{.gz,.gz.tbi}") into HaplotypeCaller_results mode flatten
             
             """
-            gatk --java-options \"-Xmx4G\" HaplotypeCaller \
+            gatk --java-options \"-Xmx8G\" HaplotypeCaller \
                 -R ${genome} \
                 -I ${sample}_md.recal.bam \
                 --emit-ref-confidence GVCF \
@@ -311,18 +312,18 @@ switch (params.mode) {
         // ====================== COLLECTION =========================== 
                 
         process run_CombineGVCF {
+            label 'gatk'
             cpus 1
             memory '10 GB'
             time '2h'
-            scratch '$HOME/tmp'
             tag { sample }
-            publishDir "$out_dir/GVCF", mode: 'copy', overwrite: false
+            // publishDir "$out_dir/GVCFs_per_chrom", mode: 'copy', overwrite: false
             
             input:
             set chrom, file(list) from HaplotypeCaller_per_chrom
             
             output:
-            set chrom, file("*") into combined_gvcf
+            set chrom, file("*{.gz,.gz.tbi}") into combined_gvcf
             
         """
         gatk --java-options \"-Xmx4G\" CombineGVCFs \
@@ -334,18 +335,18 @@ switch (params.mode) {
         }
         
         process run_GenotypeGVCF {
+            label 'gatk'
             cpus 1
             memory '10 GB'
             time '2h'
-            scratch '$HOME/tmp'
             tag { sample }
-            publishDir "$out_dir/GVCF", mode: 'copy', overwrite: false
+            publishDir "$out_dir/GVCFs_per_chrom", mode: 'copy', overwrite: false
             
             input:
             set chrom, file(list) from combined_gvcf
             
             output:
-            file("*") into geno_gvcf
+            set val("genome"), file("*") into geno_gvcf mode flatten
 
         """
         gatk --java-options \"-Xmx4G\" GenotypeGVCFs \
@@ -358,38 +359,147 @@ switch (params.mode) {
         """
         }
         
-    //     geno_gvcf.subscribe { println "$it" }
+        geno_gvcf
+            .groupTuple(by: 0, sort: 'true')
+            .set { genome_chr_genotyped }
 
-    // //     break
-    // //     // --------------------
-
-    // // case['do.VQSRCaller']:
-    // //     println "Performing something for all the samples"        
+    //     break
+    //     // --------------------
+        
+    // case['do.VQSRCaller']:
+    //     println "Performing something for all the samples"        
         
 
-    //     // process run_CombineGVCF {
-    //     //     cpus 1
-    //     //     memory '10 GB'
-    //     //     time '2h'
-    //     //     scratch '$HOME/tmp'
-    //     //     tag { sample }
-    //     //     publishDir "$out_dir/GVCF", mode: 'copy', overwrite: false
+        // GATHER!
+        process run_CombineChromGVCF {
+            label 'gatk'
+            cpus 1
+            memory '10 GB'
+            time '2h'
+            tag { sample }
+            publishDir "$out_dir/GVCF_genome", mode: 'copy', overwrite: true
             
-    //     //     input:
-    //     //     set chrom, file(chr_gvcf) from chr_gvcfs
+            input:
+            set tuple_name, file(chr_gvcf) from genome_chr_genotyped
             
-    //     //     output:
-    //     //     set , file("*") into combined_gvcf
+            output:
+            file("*") into geno_gvcf_full
             
-    //     // """
-    //     // gatk --java-options \"-Xmx4G\" CombineGVCFs \
-    //     //     -R ${genome} \
-    //     //     -L ${chrom.substring(4,)} \
-    //     //     -V ${chr_gvcf.findAll { it =~ '.g.vcf.gz$' }.join(' -V ') } \
-    //     //     -O "${chrom}.g.vcf.gz" 
-    //     // """            
-    //     // }
-        
-    }//: return carry_over
+        """
+        gatk --java-options \"-Xmx8G\" GatherVcfs \
+            -R ${genome} \
+            -I ${chr_gvcf.findAll { it =~ '.g.vcf.gz$' }.collect { (it=~/\d+|\D+/).findAll() }.toSorted().collect{ it.join() }.join(' -I ') } \
+            -O "genome_full.g.vcf.gz"
+        /home/phelelani/applications/tabix -p vcf genome_full.g.vcf.gz
+        """            
+        }
 
-//carry_over.subscribe { println "$it" }
+        process run_VQSRonSNPs {
+            label 'gatk'
+            cpus 1
+            memory '10 GB'
+            time '2h'
+            tag { sample }
+            publishDir "$out_dir/GVCF_genome", mode: 'copy', overwrite: false
+
+            input:
+            file(list) from geno_gvcf_full
+
+            output:
+            set val("geonme"), file("genome*"), file(list) into snps_vqsr_recal 
+
+        """
+        gatk --java-options \"-Xmx8G\" VariantRecalibrator \
+            -R ${genome} \
+            -resource:hapmap,known=false,training=true,truth=true,prior=15.0 ${hapmap} \
+            -resource:omni,known=false,training=true,truth=true,prior=12.0 ${omni} \
+            -resource:1000G,known=false,training=true,truth=false,prior=10.0 ${phase1_snps} \
+            -resource:dbsnp,known=true,training=false,truth=false,prior=2.0 ${dbsnp_sites} \
+            -an DP -an FS -an SOR -an MQ -an MQRankSum -an QD -an ReadPosRankSum \
+            -mode SNP --max-gaussians 4 \
+            -V ${list.findAll { it =~ '.g.vcf.gz$' }.join(' -V ') } \
+            -O genome.recal-SNP.recal \
+            --tranches-file genome.recal-SNP.tranches
+        """
+        }
+
+        process run_ApplyVQSRonSNPs {
+            label 'gatk'
+            cpus 1
+            memory '10 GB'
+            time '2h'
+            tag { sample }
+            publishDir "$out_dir/GVCF_genome", mode: 'copy', overwrite: false
+
+            input:
+            set tuple_name, file(list), file(list2) from snps_vqsr_recal
+
+            output:
+            file("genome.recal-SNP.vcf.{gz,gz.tbi}") into snps_vqsr_vcf
+
+        """
+        gatk --java-options \"-Xmx8G\" ApplyVQSR \
+            -R ${genome} \
+            --recal-file ${list.find { it =~ '.recal$' } } \
+            --tranches-file ${list.find { it =~ '.tranches$' } } \
+            -mode SNP \
+            -ts-filter-level 99.5 \
+            -V ${list2.find { it =~ '.g.vcf.gz$' } } \
+            -O genome.recal-SNP.vcf.gz
+        """
+        }
+
+        process run_VQSRonINDELs {
+            label 'gatk'
+            cpus 1
+            memory '10 GB'
+            time '2h'
+            tag { sample }
+            publishDir "$out_dir/GVCF_genome", mode: 'copy', overwrite: false
+
+            input:
+            file(list) from snps_vqsr_vcf
+
+            output:
+            set val("genome"), file("genome*"), file(list) into indel_vqsr_recal
+
+        """
+        gatk --java-options \"-Xmx8G\" VariantRecalibrator \
+            -R ${genome} \
+            -resource:mills,known=false,training=true,truth=true,prior=12.0 ${golden_indels} \
+            -resource:dbsnp,known=true,training=false,truth=false,prior=2.0 ${dbsnp_sites} \
+            -an DP -an FS -an SOR -an MQ -an MQRankSum -an QD -an ReadPosRankSum \
+            -mode INDEL --max-gaussians 4 \
+            -V ${list.find { it =~ 'vcf.gz$' } } \
+            -O "genome.recal-SNP.vcf.recal-INDEL.recal" \
+            --tranches-file "genome.recal-SNP.vcf.recal-INDEL.tranches"
+        """
+        }
+
+        process run_ApplyVQSRonINDELs {
+            label 'gatk'
+            cpus 1
+            memory '10 GB'
+            time '2h'
+            tag { sample }
+            publishDir "$out_dir/GVCF_genome", mode: 'copy', overwrite: false
+
+            input:
+            set tumple_name, file(list), file(list2) from indel_vqsr_recal
+
+            output:
+            file("genome*.vcf.{gz,gz.tbi}") into indel_vqsr_vcf
+
+        """
+        gatk --java-options \"-Xmx8G\" ApplyVQSR \
+            -R ${genome} \
+            --recal-file ${list.find { it =~ '.recal$' } } \
+            --tranches-file ${list.find { it =~ '.tranches$' } } \
+            -mode INDEL \
+            -ts-filter-level 99.0 \
+            -V ${list2.find { it =~ '.vcf.gz$' } } \
+            -O genome.recal-SNP.recal-INDEL.vcf.gz
+        """
+        }
+        
+}
