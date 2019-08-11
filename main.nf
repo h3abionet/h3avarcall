@@ -19,7 +19,6 @@ b37_bundle           = file(params.bundle, type: 'file')
 out_dir.mkdir()
 
 // GET DATA
-//read_pairs = Channel.fromFilePairs("${data_dir}/*{R,read}[1,2]_*trimmed.${ext}", type: 'file')
 read_pairs = Channel.fromFilePairs("${data_dir}/*{R,read}[1,2]*.{fastq,fastq.gz,fastq.bz2,fq,fq.gz,fq.bz2}", type: 'file')
 
 // START PROCESSING READS
@@ -137,7 +136,6 @@ switch (params.mode) {
             memory '50 GB'
             time '2h'
             tag { sample }
-            // publishDir "$out_dir/${sample}", mode: 'copy', overwrite: false
             
             input:
             set sample, file(reads) from read_pairs
@@ -159,7 +157,6 @@ switch (params.mode) {
             memory '5 GB'
             time '2h'
             tag { sample }
-            // publishDir "$out_dir/${sample}", mode: 'copy', overwrite: false
             
             input:
             set sample, file(list) from bam
@@ -184,7 +181,6 @@ switch (params.mode) {
             memory '5 GB'
             time '2h'
             tag { sample }
-            // publishDir "$out_dir/${sample}", mode: 'copy', overwrite: false
             
             input:
             set sample, file(list) from bam_md
@@ -203,18 +199,6 @@ switch (params.mode) {
             """
         }
         
-/*
-        // ====================== COLLECTION =========================== 
-        bam_md_rb
-            .map { item -> [ item[0], item[1][0], item[1][1] ] }
-            .set { bam_md_rb_flat }
-        
-        recalibration_results.join(md_bam_results_rb_flat)
-            .map { item -> [ item[0], item[1..3] ] }
-            .set { recal_table_bam_md }
-        // ====================== COLLECTION =========================== 
-
-*/
         process run_RecalibrateBAM {
             label 'gatk'
             cpus 8
@@ -261,7 +245,6 @@ switch (params.mode) {
             """
         }
         
-    //     recal_stats.subscribe { println }
     //     break
     //     // --------------------
 
@@ -277,7 +260,6 @@ switch (params.mode) {
             memory '10 GB'
             time '5h'
             tag { "${sample}_chr_${chrom}" }
-            // publishDir "$out_dir/${sample}", mode: 'copy', overwrite: false
             
             input:
             set sample, file(list) from bam_recal
@@ -313,7 +295,6 @@ switch (params.mode) {
             memory '10 GB'
             time '2h'
             tag { "chr_${chrom}" }
-            // publishDir "$out_dir/GVCF_genotype_chrom", mode: 'copy', overwrite: false
             
             input:
             set chrom, file(list) from haplotype_calls_chrom
@@ -359,7 +340,6 @@ switch (params.mode) {
             .groupTuple(by: 0, sort: 'true')
             .set { genotype_vcf_list }
 
-        // genotype_gvcf.view()
 
     //     break
     //     // --------------------
@@ -398,7 +378,6 @@ switch (params.mode) {
             memory '10 GB'
             time '2h'
             tag { "Genome" }
-            // publishDir "$out_dir/VQSR_genome_calling", mode: 'copy', overwrite: false
 
             input:
             file(list) from genome_genotype_vcf
@@ -448,16 +427,12 @@ switch (params.mode) {
         """
         }
 
-        vqsr_snp_apply.view()
-
-/*
         process run_VQSRonINDELs {
             label 'gatk'
             cpus 1
             memory '10 GB'
             time '2h'
             tag { "Genome" }
-            // publishDir "$out_dir/VQSR_genome_calling", mode: 'copy', overwrite: false
 
             input:
             file(list_vcf) from vqsr_snp_apply
@@ -503,5 +478,4 @@ switch (params.mode) {
             -O genome.SNP-recal.INDEL-recal.vcf.gz
         """
         }
-*/
 }
