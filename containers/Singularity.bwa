@@ -30,6 +30,6 @@ cd /opt \
     && rm /opt/samtools-1.7.tar.bz2
 
 %environment
-## Add paths to environment
+## Add the paths to environment
 export PATH=/opt/bwa-0.7.17:$PATH
 export PATH=/opt/samtools-1.7/bin:$PATH
