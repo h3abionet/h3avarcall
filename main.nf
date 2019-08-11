@@ -355,7 +355,7 @@ switch (params.mode) {
             memory '10 GB'
             time '2h'
             tag { "Genome" }
-            publishDir "$out_dir/VQSR_genome_calling", mode: 'copy', overwrite: true
+//            publishDir "$out_dir/VQSR_genome_calling", mode: 'copy', overwrite: true
             
             input:
             set tuple, file(list) from genotype_vcf_list
@@ -368,7 +368,7 @@ switch (params.mode) {
             -R ${genome} \
             -I ${list.findAll { it =~ '.vcf.gz$' }.collect { (it=~/\d+|\D+/).findAll() }.toSorted().collect{ it.join() }.join(' -I ') } \
             -O "genome.vcf.gz"
-        /home/phelelani/applications/tabix -p vcf genome.vcf.gz
+        tabix -p vcf genome.vcf.gz
         """
         }
 
@@ -400,13 +400,12 @@ switch (params.mode) {
         """
         }
 
-
         process run_ApplyVQSRonSNPs {
             label 'gatk'
-            cpus 8
-            memory '20 GB'
+            cpus 1
+            memory '10 GB'
             time '2h'
-            tag { tuple_name }
+            tag { "Genome" }
             publishDir "$out_dir/VQSR_genome_calling", mode: 'copy', overwrite: false
 
             input:
@@ -448,8 +447,8 @@ switch (params.mode) {
             -an DP -an FS -an SOR -an MQ -an MQRankSum -an QD -an ReadPosRankSum \
             -mode INDEL --max-gaussians 4 \
             -V ${list_vcf.find { it =~ 'vcf.gz$' } } \
-            -O "genome.recal-SNP.recal-INDEL.recal" \
-            --tranches-file "genome.recal-SNP.recal-INDEL.tranches"
+            -O genome.recal-SNP.recal-INDEL.recal \
+            --tranches-file genome.recal-SNP.recal-INDEL.tranches
         """
         }
 
@@ -458,7 +457,7 @@ switch (params.mode) {
             cpus 1
             memory '10 GB'
             time '2h'
-            tag { "Apply VQSR on INDELs" }
+            tag { "Genome" }
             publishDir "$out_dir/VQSR_genome_calling", mode: 'copy', overwrite: false
 
             input:
