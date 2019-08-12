@@ -47,7 +47,7 @@ params {
     data         = "$baseDir/data"
     out          = "$baseDir/results"
     bundle       = "$baseDir/gatk-b37-bundle/b37_files_minimal.txt"
-    mode         = "do.QC"  // DIFFENT MODES: do.GetContainers | do.GenomeIndexing | do.QC | do.Trimming | do.Alignment
+    mode         = "do.QC"
     trim         = "ILLUMINACLIP:TruSeq3-PE-2.fa:2:30:10:8:true TRAILING:28 MINLEN:40"
     resources    = "$baseDir/gatk-b37-bundle"
     from         = null
