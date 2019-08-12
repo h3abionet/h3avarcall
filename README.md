@@ -1,9 +1,36 @@
-# H3ABioNet Variant Calling Nextflow Pipeline (h3avarcall)
+# ```h3avarcall``` - An H3ABioNet Variant Calling Nextflow Pipeline (h3avarcall)
 ```h3avarcall``` is an H3ABioNet Variant Calling [```Nextflow```](https://www.nextflow.io/) pipeleline developed for blah blah blah...
 
-## 1. DATA PREPARATION
+## 1. Data Pipeline Preparation 
+```
+git clone https://github.com/h3abionet/h3avarcall.git
+cd h3avarcall
+```
+Contents of the repository:
+```
+h3avarcall
+    |-containers
+    |    |--Singularity.bwa
+    |    |--Singularity.fastqc
+    |    |--Singularity.gatk
+    |    |--Singularity.trimmomatic
+    |--gatk-b37-bundle
+    |    |--b37_files_minimal.txt
+    |--templates
+    |    |--download_bundles.sh
+    |--LICENSE
+    |--README.md
+    |--main.config
+    |--main.nf
+    |--nextflow.config
+```
+
 
 ### 1.1. Download the test datasets first:
+
+
+
+
 Assuming you have no data to play with, make a directory in the workflow directory and call it ```data``` before continuing, or else provide your own directory where the ```FASTQ``` files are and skip this step. ``cd`` into ``data`` and download the test data using one of the following methods.
 
 #### 1.1.2. Using LFTP (Faster)
