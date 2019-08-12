@@ -498,7 +498,6 @@ switch (mode) {
         """
         }
 
-/*
         process run_ApplyVQSRonINDELs {
             label 'gatk'
             cpus 1
@@ -524,7 +523,4 @@ switch (mode) {
             -O genome.SNP-recal.INDEL-recal.vcf.gz
         """
         }
-
-        vqsr_indel_apply.view() 
-        */
 }
