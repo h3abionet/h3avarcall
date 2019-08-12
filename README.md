@@ -100,13 +100,13 @@ nextflow run main.nf -profile slurm --mode do.VariantFiltering --from do.Variant
 
 ## 3. `h3avarcall` results
 Assuming the output folder was left as default (in the `main.config` file), the results for running the `h3avarcall` will be found in the `results` folder of the `h3avarcall` repository. The results for each of the main workflow steps (`2.1` - `2.5`) are grouped as follows:
-```
-- [x] Read QC (optional)         =>    1_QC
-- [x] Read Trimming (optional)   =>    2_Read_Trimming
-- [x] Read Alignment             =>    3_Read_Alignment
-- [x] Variant Calling            =>    4_Variant_Calling
-- [x] Variant Filtering          =>    5_Variant_Filtering
-```
+
+- [x] Read QC (optional)         =>    `results/1_QC`
+- [x] Read Trimming (optional)   =>    `results/2_Read_Trimming`
+- [x] Read Alignment             =>    results/3_Read_Alignment
+- [x] Variant Calling            =>    results/4_Variant_Calling
+- [x] Variant Filtering          =>    results/5_Variant_Filtering
+
 
 ```bash
 h3avarcall
