@@ -64,7 +64,7 @@ nextflow run main.nf -profile slurm --mode do.GenomeIndexing
 nextflow run main.nf -profile slurm --mode do.QC
 ```
 
-#### 2.2. Read Trimming (optional):
+### 2.2. Read Trimming (optional):
 ```bash
 nextflow run main.nf -profile slurm --mode do.ReadTrimming
 ```
