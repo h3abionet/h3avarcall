@@ -97,3 +97,10 @@ nextflow run main.nf -profile slurm --mode do.VariantCalling --from do.ReadAlign
 ```bash
 nextflow run main.nf -profile slurm --mode do.VariantFiltering --from do.VariantCalling 
 ```
+
+## 3. `h3avarcall` results
+### 3.1. 
+### 3.2.
+### 3.3.
+### 3.4.
+### 3.5.
