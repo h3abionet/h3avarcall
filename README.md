@@ -10,7 +10,7 @@ cd h3avarcall
 Contents of the repository:
 ```bash
 h3avarcall
-  |-containers                        ## Folder for Singularity images and recipes (in case you want to build yourself). All downloaded images go here!
+  |--containers                        ## Folder for Singularity images and recipes (in case you want to build yourself). All downloaded images go here!
   |  |--Singularity.bwa               ## Singularity recipe file for BWA and Samtools.
   |  |--Singularity.fastqc            ## Singularity recipe file for FastQC.
   |  |--Singularity.gatk              ## Singularity recipe file for GATK and tabix.
@@ -99,6 +99,52 @@ nextflow run main.nf -profile slurm --mode do.VariantFiltering --from do.Variant
 ```
 
 ## 3. `h3avarcall` results
+```bash
+h3avarcall
+  |--results
+  |  |--1_QC
+  |  |  |--workflow_report
+  |  |  |  |--h3avarcall_report.html
+  |  |  |  |--h3avarcall_timeline.html
+  |  |  |  |--h3avarcall_workflow.dot
+  |  |  |  |--h3avarcall_trace.txt
+  |  |  |--<sample_1>_R1.fastqc.html .. <sample_N>_R1.fastqc.html
+  |  |  |--<sample_1>_R2.fastqc.html .. <sample_N>_R1.fastqc.html
+  |  |--2_Read_Trimming
+  |  |  |--workflow_report
+  |  |  |  |--h3avarcall_report.html
+  |  |  |  |--h3avarcall_timeline.html
+  |  |  |  |--h3avarcall_workflow.dot
+  |  |  |  |--h3avarcall_trace.txt
+  |  |  |--<sample_1>.1P.fastq.gz .. <sample_N>.1P.fastq.gz
+  |  |  |--<sample_1>.2P.fastq.gz .. <sample_N>.2P.fastq.gz
+  |  |--3_Read_Alignment
+  |  |  |--workflow_report
+  |  |  |  |--h3avarcall_report.html
+  |  |  |  |--h3avarcall_timeline.html
+  |  |  |  |--h3avarcall_workflow.dot
+  |  |  |  |--h3avarcall_trace.txt
+  |  |  |--<sample_1>_md.recal.bam .. <sample_N>_md.recal.bam
+  |  |  |--<sample_1>_md.recal.bai .. <sample_N>_md.recal.bai
+  |  |--4_Variant_Calling
+  |  |  |--workflow_report
+  |  |  |  |--h3avarcall_report.html
+  |  |  |  |--h3avarcall_timeline.html
+  |  |  |  |--h3avarcall_workflow.dot
+  |  |  |  |--h3avarcall_trace.txt
+  |  |  |--chr_1_genotyped.vcf.gz .. chr_22_genotyped.vcf.gz
+  |  |  |--chr_1_genotyped.vcf.gz.tbi .. chr_22_genotyped.vcf.gz.tbi
+  |  |--5_Variant_Filtering
+  |  |  |--workflow_report
+  |  |  |  |--h3avarcall_report.html
+  |  |  |  |--h3avarcall_timeline.html
+  |  |  |  |--h3avarcall_workflow.dot
+  |  |  |  |--h3avarcall_trace.txt
+  |  |  |--genome.SNP-recal.vcf.gz
+  |  |  |--genome.SNP-recal.vcf.gz.tbi
+  |--work
+  |  |--
+```
 ### 3.1. 
 ### 3.2.
 ### 3.3.
