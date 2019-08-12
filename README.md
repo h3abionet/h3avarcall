@@ -1,7 +1,7 @@
 # `h3avarcall` - H3ABioNet Variant Calling Pipeline
 `h3avarcall` is an H3ABioNet Variant Calling [```Nextflow```](https://www.nextflow.io/) pipeleline developed for blah blah blah...
 
-## 1. Data Pipeline Preparation
+## 1. Obtaining pipeline and preparing Data
 Clone `h3avarcall` repository onto you machine:
 ```bash
 git clone https://github.com/h3abionet/h3avarcall.git
