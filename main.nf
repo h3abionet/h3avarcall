@@ -7,22 +7,75 @@ data_dir             = file(params.data, type: 'dir')
 out_dir              = file(params.out, type: 'dir')
 trim_params          = params.trim
 resources            = file(params.resources, type: 'dir')
+mode                 = params.mode
+resume_from          = params.from
 
+b37_bundle           = file(params.bundle, type: 'file')
 genome               = file("${resources}/human_g1k_v37_decoy.fasta", type: 'file')
 dbsnp_sites          = file("${resources}/dbsnp_138.b37.vcf", type: 'file')
 hapmap               = file("${resources}/hapmap_3.3.b37.vcf", type: 'file')
 omni                 = file("${resources}/1000G_omni2.5.b37.vcf", type: 'file')
+phase1_indels        = file("${resources}/1000G_phase1.indels.b37.vcf", type: 'file')
 phase1_snps          = file("${resources}/1000G_phase1.snps.high_confidence.b37.vcf", type: 'file')
 golden_indels        = file("${resources}/Mills_and_1000G_gold_standard.indels.b37.vcf", type: 'file')
-b37_bundle           = file(params.bundle, type: 'file')
 
 out_dir.mkdir()
 
-// GET DATA
-read_pairs = Channel.fromFilePairs("${data_dir}/*{R,read}[1,2]*.{fastq,fastq.gz,fastq.bz2,fq,fq.gz,fq.bz2}", type: 'file')
+// // GET DATA
+if(mode == null){
+    
+} else if(mode == 'do.GetContainers') {
+    
+} else if(mode == 'do.GenomeIndexing') {
+    
+} else if(mode == 'do.QC') {
+    if(resume_from == null) {
+        read_pairs = Channel.fromFilePairs("${data_dir}/*{R,read}[1,2]*.{fastq,fastq.gz,fastq.bz2,fq,fq.gz,fq.bz2}", type: 'file')
+    } else if(resume_from == 'do.Trimming') {
+        read_pairs = Channel.fromFilePairs("${out_dir}/2_Read_Trimming/*{R,read,P}[1,2]*.{fastq,fastq.gz,fastq.bz2,fq,fq.gz,fq.bz2}", type: 'file')
+    } else {
+        exit 1,"DAMMIT DUDE, DO READ ALIGNMENT!!"
+    }
+} else if(mode == 'do.Trimming') {
+    if(resume_from == null) {
+        read_pairs = Channel.fromFilePairs("${data_dir}/*{R,read}[1,2]*.{fastq,fastq.gz,fastq.bz2,fq,fq.gz,fq.bz2}", type: 'file')
+    } else if(resume_from == 'do.QC') {
+        read_pairs = Channel.fromFilePairs("${out_dir}/2_Read_Trimming/*{R,read,P}[1,2]*.{fastq,fastq.gz,fastq.bz2,fq,fq.gz,fq.bz2}", type: 'file')
+    } else {
+        exit 1,"DAMMIT DUDE, DO READ ALIGNMENT!!"
+    }
+} else if(mode == 'do.Alignment') {
+    if(resume_from == null) {
+        read_pairs = Channel.fromFilePairs("${data_dir}/*{R,read}[1,2]*.{fastq,fastq.gz,fastq.bz2,fq,fq.gz,fq.bz2}", type: 'file')
+    } else if(resume_from == 'do.QC') {
+        read_pairs = Channel.fromFilePairs("${data_dir}/*{R,read}[1,2]*.{fastq,fastq.gz,fastq.bz2,fq,fq.gz,fq.bz2}", type: 'file')
+    } else if(resume_from == 'do.Trimming') {
+        read_pairs = Channel.fromFilePairs("${out_dir}/2_Read_Trimming/*[1,2]P.{fastq,fastq.gz,fastq.bz2,fq,fq.gz,fq.bz2}", type: 'file')
+    } else {
+        exit 1,"DAMMIT DUDE, DO READ ALIGNMENT!!"
+    }
+} else if(mode == 'do.VariantCalling') {
+    if(resume_from == null) {
+        bam_recal = Channel.fromFilePairs("${out_dir}/3_Read_Alignment/*_md.recal.{bai,bam}")
+    } else if(resume_from == 'do.Alignment') {
+        bam_recal = Channel.fromFilePairs("${out_dir}/3_Read_Alignment/*_md.recal.{bai,bam}")
+    } else {
+        exit 1, "DAMMIT DUDE, DO READ ALIGNMENT!!"
+    }
+} else if(mode == 'do.VariantFiltering') {
+    if(resume_from == null) {
+        genotype_vcf_list = Channel.fromFilePairs("${out_dir}/4_Variant_Calling/*genotyped.vcf.{gz,gz.tbi}", size: -1) { it -> "${it.name.substring(0,3)}" }
+    } else if(resume_from == 'do.VariantCalling') {
+        genotype_vcf_list = Channel.fromFilePairs("${out_dir}/4_Variant_Calling/*genotyped.vcf.{gz,gz.tbi}", size: -1) { it -> "${it.name.substring(0,3)}" }
+    } else {
+        exit 1,"DAMMIT DUDE, DO READ ALIGNMENT!!"
+    }
+} else {
+    
+}
 
 // START PROCESSING READS
-switch (params.mode) {
+switch (mode) {
         // Download the Singularity images required to execute this workflow! 
     case['do.GetContainers']:
         println "\nDownloading Singularity containers."
@@ -35,7 +88,7 @@ switch (params.mode) {
             memory '2 GB'
             time '2h'
             tag { "Downloading: $link" }
-            publishDir "$baseDir/containers", mode: 'copy', overwrite: false
+            publishDir "$baseDir/containers", mode: 'copy', overwrite: true
             
             input:
             each link from shub_images
@@ -59,7 +112,7 @@ switch (params.mode) {
             memory '5 GB'
             time '2h'
             tag { sample }
-            publishDir "$baseDir/resources", mode: 'copy', overwrite: false
+            publishDir "$baseDir/resources", mode: 'copy', overwrite: true
             
             output:
             file("*.gz") into gatk_bundle
@@ -68,7 +121,7 @@ switch (params.mode) {
             b37_list = "${b37_bundle}"
             template 'download_bundles.sh'
         }
-        // break
+        break
         // --------------------
 
     case['do.QC']:
@@ -80,14 +133,13 @@ switch (params.mode) {
             memory '10 GB'
             time '2h'
             tag { sample }
-            publishDir "$out_dir/${sample}", mode: 'copy', overwrite: false
+            publishDir "$out_dir/1_QC", mode: 'copy', overwrite: true
             
             input:
             set sample, file(reads) from read_pairs
             
             output:
             set sample, file("${sample}*.html") into qc_html
-            set sample, file(reads) into read_pairs_qc
             
             """
             fastqc ${reads.get(0)} ${reads.get(1)} \
@@ -95,7 +147,7 @@ switch (params.mode) {
                 --noextract
             """
         }
-        // break
+        break
         // --------------------
 
     case['do.Trimming']:
@@ -107,7 +159,7 @@ switch (params.mode) {
             memory '50 GB'
             time '2h'
             tag { sample }
-            publishDir "$out_dir/${sample}", mode: 'copy', overwrite: false
+            publishDir "$out_dir/2_Read_Trimming", mode: 'copy', overwrite: true
             
             input:
             set sample, file(reads) from read_pairs
@@ -124,7 +176,7 @@ switch (params.mode) {
                 \$(sed 's|ILLUMINACLIP:|ILLUMINACLIP:/opt/Trimmomatic-0.39/adapters/|' <<< "${trim_params}")
             """
         }
-        // break
+        break
         // --------------------        
         
     case['do.Alignment']:
@@ -177,7 +229,7 @@ switch (params.mode) {
 
         process run_CreateRecalibrationTable {
             label 'gatk'
-            cpus 1
+            cpus 2
             memory '5 GB'
             time '2h'
             tag { sample }
@@ -186,26 +238,26 @@ switch (params.mode) {
             set sample, file(list_bam) from bam_md
 
             output:
-            set sample, file(list_bam), file("${sample}_recal.table") into recal_table // mode flatten
+            set sample, file(list_bam), file("${sample}_recal.table") into recal_table 
 
             """
             gatk --java-options \"-Xmx4G\" BaseRecalibrator \
                 --input ${list_bam.find { it =~ '_md.bam$' } } \
                 --output ${sample}_recal.table \
                 -R ${genome} \
-                --known-sites ${resources}/dbsnp_138.b37.vcf \
-                --known-sites ${resources}/1000G_phase1.indels.b37.vcf \
-                --known-sites ${resources}/Mills_and_1000G_gold_standard.indels.b37.vcf
+                --known-sites ${dbsnp_sites} \
+                --known-sites ${phase1_indels} \
+                --known-sites ${golden_indels}
             """
         }
-        
+  
         process run_RecalibrateBAM {
             label 'gatk'
             cpus 8
             memory '5 GB'
             time '2h'
             tag { sample }
-            publishDir "$out_dir/${sample}", mode: 'copy', overwrite: false
+            publishDir "$out_dir/3_Read_Alignment", mode: 'copy', overwrite: true
             
             input:
             set sample, file(list_bam), file(table) from recal_table
@@ -223,14 +275,13 @@ switch (params.mode) {
             """
         }
 
-
         process run_SamtoolsStats {
             label 'bwa'
             cpus 11
             memory '50 GB'
             time '2h'
             tag { sample }
-            publishDir "$out_dir/${sample}", mode: 'copy', overwrite: true
+            publishDir "$out_dir/3_Read_Alignment", mode: 'copy', overwrite: true
             
             input:
             set sample, file(list_bam) from bam_recal_stats
@@ -244,12 +295,11 @@ switch (params.mode) {
                 ${list_bam.find { it =~ '_md.recal.bam$' } } > ${sample}_md.recal.stats
             """
         }
-        
-    //     break
-    //     // --------------------
+        break
+        // --------------------
 
-    // case['do.HaplotypeCaller']:
-    //     println "Performing something for all the samples"    
+    case['do.VariantCalling']:
+        println "Performing something for all the samples"    
 
         chromosomes = Channel.from ( 1..22 )
 
@@ -316,7 +366,7 @@ switch (params.mode) {
             memory '10 GB'
             time '2h'
             tag { "chr_${chrom}" }
-            publishDir "$out_dir/GVCF_genotype_chrom", mode: 'copy', overwrite: false
+            publishDir "$out_dir/4_Variant_Calling", mode: 'copy', overwrite: true
             
             input:
             set chrom, file(list_gvcf) from gvcfs_chrom
@@ -339,14 +389,12 @@ switch (params.mode) {
             .groupTuple(by: 0, sort: 'true')
             .set { genotype_vcf_list }
 
-
-    //     break
-    //     // --------------------
+        break
+        // --------------------
         
-    // case['do.VQSRCaller']:
-    //     println "Performing something for all the samples"        
+    case['do.VariantFiltering']:
+        println "Performing something for all the samples"        
         
-
         // GATHER!
         process run_CombineChromVCFs {
             label 'gatk'
@@ -404,6 +452,7 @@ switch (params.mode) {
             memory '10 GB'
             time '2h'
             tag { "Genome" }
+            publishDir "$out_dir/5_Variant_Filtering", mode: 'copy', overwrite: true
 
             input:
             set tuple_name, file(list_vcf), file(list_recal) from vqsr_snp_recal
@@ -422,7 +471,6 @@ switch (params.mode) {
             -O genome.SNP-recal.vcf.gz
         """
         }
-
 
         process run_VQSRonINDELs {
             label 'gatk'
@@ -450,14 +498,14 @@ switch (params.mode) {
         """
         }
 
-
+/*
         process run_ApplyVQSRonINDELs {
             label 'gatk'
             cpus 1
             memory '10 GB'
             time '2h'
             tag { "Genome" }
-            publishDir "$out_dir/VQSR_genome_calling", mode: 'copy', overwrite: false
+            publishDir "$out_dir/5_Variant_Filtering", mode: 'copy', overwrite: true
 
             input:
             set tumple_name, file(list_vcf), file(list_recal) from vqsr_indel_recal
@@ -476,4 +524,7 @@ switch (params.mode) {
             -O genome.SNP-recal.INDEL-recal.vcf.gz
         """
         }
+
+        vqsr_indel_apply.view() 
+        */
 }
