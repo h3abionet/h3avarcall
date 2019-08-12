@@ -101,13 +101,13 @@ nextflow run main.nf -profile slurm --mode do.VariantFiltering --from do.Variant
 ## 3. `h3avarcall` results
 Assuming the output folder was left as default (in the `main.config` file), the results for running the `h3avarcall` will be found in the `results` folder of the `h3avarcall` repository. The results for each of the main workflow steps (`2.1` - `2.5`) are grouped as follows:
 
-- [x] Read QC (optional)         =>    `results/1_QC`
-- [x] Read Trimming (optional)   =>    `results/2_Read_Trimming`
-- [x] Read Alignment             =>    `results/3_Read_Alignment`
-- [x] Variant Calling            =>    `results/4_Variant_Calling`
-- [x] Variant Filtering          =>    `results/5_Variant_Filtering`
+- [x] Read QC (optional)         =>    `results/1_QC`
+- [x] Read Trimming (optional)   =>    `results/2_Read_Trimming`
+- [x] Read Alignment             =>    `results/3_Read_Alignment`
+- [x] Variant Calling            =>    `results/4_Variant_Calling`
+- [x] Variant Filtering          =>    `results/5_Variant_Filtering`
 
-Nested withing these results folders are ouput files from each step of the workflow, including a folder "`workflow_report`" containing `h3avarcall_report.html`, `h3avarcall_timeline.html`, `h3avarcall_workflow.dot` and `h3avarcall_trace.txt`. The `results` directory structure within `h3avarcall` repository can be summarized as below:
+Nested withing these results folders are ouput files from each step of the workflow, including a folder "`workflow_report`" containing `h3avarcall_report.html`, `h3avarcall_timeline.html`, `h3avarcall_workflow.dot` and `h3avarcall_trace.txt` that contain detailed information on the resources (CPU, MEMORY and TIME) usage of each process in the steps. The `results` directory structure within `h3avarcall` repository can be summarized as below:
 
 ```bash
 h3avarcall
