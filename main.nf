@@ -183,14 +183,14 @@ switch (params.mode) {
             tag { sample }
             
             input:
-            set sample, file(list) from bam_md
+            set sample, file(list_bam) from bam_md
 
             output:
-            set sample, file(list), file("${sample}_recal.table") into recal_table // mode flatten
+            set sample, file(list_bam), file("${sample}_recal.table") into recal_table // mode flatten
 
             """
             gatk --java-options \"-Xmx4G\" BaseRecalibrator \
-                --input ${list.find { it =~ '_md.bam$' } } \
+                --input ${list_bam.find { it =~ '_md.bam$' } } \
                 --output ${sample}_recal.table \
                 -R ${genome} \
                 --known-sites ${resources}/dbsnp_138.b37.vcf \
@@ -208,14 +208,14 @@ switch (params.mode) {
             publishDir "$out_dir/${sample}", mode: 'copy', overwrite: false
             
             input:
-            set sample, file(list), file(table) from recal_table
+            set sample, file(list_bam), file(table) from recal_table
 
             output:
             set sample, file("${sample}_md.recal.{bam,bai}") into bam_recal, bam_recal_stats
             
             """
             gatk --java-options \"-Xmx4G\" ApplyBQSR \
-                 --input ${list.find { it =~ '_md.bam$' } } \
+                 --input ${list_bam.find { it =~ '_md.bam$' } } \
                  --output ${sample}_md.recal.bam \
                  -R ${genome} \
                  --create-output-bam-index true \
@@ -233,7 +233,7 @@ switch (params.mode) {
             publishDir "$out_dir/${sample}", mode: 'copy', overwrite: true
             
             input:
-            set sample, file(list) from bam_recal_stats
+            set sample, file(list_bam) from bam_recal_stats
 
             output:
             set sample, file("${sample}_md.recal.stats")  into samtools_stats
@@ -241,7 +241,7 @@ switch (params.mode) {
             """
             samtools stats \
                 --threads 10 \
-                ${list.find { it =~ '_md.recal.bam$' } } > ${sample}_md.recal.stats
+                ${list_bam.find { it =~ '_md.recal.bam$' } } > ${sample}_md.recal.stats
             """
         }
         
@@ -250,7 +250,6 @@ switch (params.mode) {
 
     // case['do.HaplotypeCaller']:
     //     println "Performing something for all the samples"    
-    //     recalibrated_results = Channel.fromFilePairs("$out_dir//*_md.recal{.bam,.bai}", type: 'file', size: 2)
 
         chromosomes = Channel.from ( 1..22 )
 
@@ -262,7 +261,7 @@ switch (params.mode) {
             tag { "${sample}_chr_${chrom}" }
             
             input:
-            set sample, file(list) from bam_recal
+            set sample, file(list_bam) from bam_recal
             each chrom from chromosomes
 
             output:
@@ -271,7 +270,7 @@ switch (params.mode) {
             """
             gatk --java-options \"-Xmx8G\" HaplotypeCaller \
                 -R ${genome} \
-                -I ${list.find { it =~ '_md.recal.bam$' } } \
+                -I ${list_bam.find { it =~ '_md.recal.bam$' } } \
                 --emit-ref-confidence GVCF \
                 --dbsnp ${dbsnp_sites} \
                 --L ${chrom} \
@@ -297,7 +296,7 @@ switch (params.mode) {
             tag { "chr_${chrom}" }
             
             input:
-            set chrom, file(list) from haplotype_calls_chrom
+            set chrom, file(list_gvcf) from haplotype_calls_chrom
             
             output:
             set chrom, file("*.g.vcf.{gz,gz.tbi}") into gvcfs_chrom
@@ -306,7 +305,7 @@ switch (params.mode) {
         gatk --java-options \"-Xmx4G\" CombineGVCFs \
             -R ${genome} \
             -L ${chrom.substring(4,)} \
-            -V ${list.findAll { it =~ '.g.vcf.gz$' }.join(' -V ') } \
+            -V ${list_gvcf.findAll { it =~ '.g.vcf.gz$' }.join(' -V ') } \
             -O "${chrom}.g.vcf.gz"
         """            
         }
@@ -320,7 +319,7 @@ switch (params.mode) {
             publishDir "$out_dir/GVCF_genotype_chrom", mode: 'copy', overwrite: false
             
             input:
-            set chrom, file(list) from gvcfs_chrom
+            set chrom, file(list_gvcf) from gvcfs_chrom
             
             output:
             set val("genome"), file("*.vcf.{gz,gz.tbi}") into genotype_vcfs_chrom mode flatten
@@ -329,7 +328,7 @@ switch (params.mode) {
         gatk --java-options \"-Xmx4G\" GenotypeGVCFs \
             -R ${genome} \
             -L ${chrom.substring(4,)} \
-            -V ${list.findAll { it =~ '.g.vcf.gz$' }.join() } \
+            -V ${list_gvcf.findAll { it =~ '.g.vcf.gz$' }.join() } \
             -stand-call-conf 30 \
             -A Coverage -A FisherStrand -A StrandOddsRatio -A MappingQualityRankSumTest -A QualByDepth -A RMSMappingQuality -A ReadPosRankSumTest \
             -O "${chrom}_genotyped.vcf.gz"
@@ -355,10 +354,9 @@ switch (params.mode) {
             memory '10 GB'
             time '2h'
             tag { "Genome" }
-//            publishDir "$out_dir/VQSR_genome_calling", mode: 'copy', overwrite: true
             
             input:
-            set tuple, file(list) from genotype_vcf_list
+            set tuple, file(list_vcf) from genotype_vcf_list
             
             output:
             file("genome.vcf.{gz,gz.tbi}") into genome_genotype_vcf
@@ -366,7 +364,7 @@ switch (params.mode) {
         """
         gatk --java-options \"-Xmx8G\" GatherVcfs \
             -R ${genome} \
-            -I ${list.findAll { it =~ '.vcf.gz$' }.collect { (it=~/\d+|\D+/).findAll() }.toSorted().collect{ it.join() }.join(' -I ') } \
+            -I ${list_vcf.findAll { it =~ '.vcf.gz$' }.collect { (it=~/\d+|\D+/).findAll() }.toSorted().collect{ it.join() }.join(' -I ') } \
             -O "genome.vcf.gz"
         tabix -p vcf genome.vcf.gz
         """
@@ -380,10 +378,10 @@ switch (params.mode) {
             tag { "Genome" }
 
             input:
-            file(list) from genome_genotype_vcf
+            file(list_vcf) from genome_genotype_vcf
 
             output:
-            set val("geonme"), file("*.{recal,tranches}"), file(list) into vqsr_snp_recal 
+            set val("genome"), file(list_vcf), file("*.{recal,recal.idx,tranches}") into vqsr_snp_recal 
 
         """
         gatk --java-options \"-Xmx8G\" VariantRecalibrator \
@@ -394,7 +392,7 @@ switch (params.mode) {
             -resource:dbsnp,known=true,training=false,truth=false,prior=2.0 ${dbsnp_sites} \
             -an DP -an FS -an SOR -an MQ -an MQRankSum -an QD -an ReadPosRankSum \
             -mode SNP --max-gaussians 4 \
-            -V ${list.findAll { it =~ '.vcf.gz$' }.join(' -V ') } \
+            -V ${list_vcf.findAll { it =~ '.vcf.gz$' }.join(' -V ') } \
             -O genome.recal-SNP.recal \
             --tranches-file genome.recal-SNP.tranches
         """
@@ -406,10 +404,9 @@ switch (params.mode) {
             memory '10 GB'
             time '2h'
             tag { "Genome" }
-            publishDir "$out_dir/VQSR_genome_calling", mode: 'copy', overwrite: false
 
             input:
-            set tuple_name, file(list_recal), file(list_vcf) from vqsr_snp_recal
+            set tuple_name, file(list_vcf), file(list_recal) from vqsr_snp_recal
 
             output:
             file("genome.SNP-recal.vcf.{gz,gz.tbi}") into vqsr_snp_apply
@@ -426,6 +423,7 @@ switch (params.mode) {
         """
         }
 
+
         process run_VQSRonINDELs {
             label 'gatk'
             cpus 1
@@ -437,7 +435,7 @@ switch (params.mode) {
             file(list_vcf) from vqsr_snp_apply
 
             output:
-            set val("genome"), file("*.{recal,tranches}"), file(list_vcf) into vqsr_indel_recal
+            set val("genome"), file(list_vcf), file("*.{recal,recal.idx,tranches}") into vqsr_indel_recal
 
         """
         gatk --java-options \"-Xmx8G\" VariantRecalibrator \
@@ -452,6 +450,7 @@ switch (params.mode) {
         """
         }
 
+
         process run_ApplyVQSRonINDELs {
             label 'gatk'
             cpus 1
@@ -461,7 +460,7 @@ switch (params.mode) {
             publishDir "$out_dir/VQSR_genome_calling", mode: 'copy', overwrite: false
 
             input:
-            set tumple_name, file(list_recal), file(list_vcf) from vqsr_indel_recal
+            set tumple_name, file(list_vcf), file(list_recal) from vqsr_indel_recal
 
             output:
             file("genome.SNP-recal.INDEL-recal.vcf.{gz,gz.tbi}") into vqsr_indel_apply
