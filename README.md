@@ -10,7 +10,7 @@ cd h3avarcall
 Contents of the repository:
 ```bash
 h3avarcall
-  |--containers                        ## Folder for Singularity images and recipes (in case you want to build yourself). All downloaded images go here!
+  |--containers                       ## Folder for Singularity images and recipes (in case you want to build yourself). All downloaded images go here!
   |  |--Singularity.bwa               ## Singularity recipe file for BWA and Samtools.
   |  |--Singularity.fastqc            ## Singularity recipe file for FastQC.
   |  |--Singularity.gatk              ## Singularity recipe file for GATK and tabix.
@@ -143,7 +143,7 @@ h3avarcall
   |  |  |--genome.SNP-recal.vcf.gz
   |  |  |--genome.SNP-recal.vcf.gz.tbi
   |--work
-  |  |--
+  |  |--<There's a lot of folders here! Lets not worry about them for today!>
 ```
 ### 3.1. 
 ### 3.2.
