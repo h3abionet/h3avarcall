@@ -8,22 +8,22 @@ git clone https://github.com/h3abionet/h3avarcall.git
 cd h3avarcall
 ```
 Contents of the repository:
-```
+```bash
 h3avarcall
-  |-containers
-  |  |--Singularity.bwa
-  |  |--Singularity.fastqc
-  |  |--Singularity.gatk
-  |  |--Singularity.trimmomatic
-  |--gatk-b37-bundle
-  |  |--b37_files_minimal.txt
-  |--templates
-  |  |--download_bundles.sh
-  |--LICENSE
-  |--README.md
-  |--main.config
-  |--main.nf
-  |--nextflow.config
+  |-containers                        ## Folder for Singularity images and recipes (in case you want to build yourself). All downloaded images go here!
+  |  |--Singularity.bwa               ## Singularity recipe file for BWA and Samtools.
+  |  |--Singularity.fastqc            ## Singularity recipe file for FastQC.
+  |  |--Singularity.gatk              ## Singularity recipe file for GATK and tabix.
+  |  |--Singularity.trimmomatic       ## Singularity recipe file for Trimmimatic.
+  |--gatk-b37-bundle                  ## Folder for stoding downloaded GATK-b37-bundle files.
+  |  |--b37_files_minimal.txt         ## LList of GATK-b37-bundle files to be downloaded (bundle TOO BIG! Only selected files needed for the workflow). 
+  |--templates                        ## Folder for extra scripts for the workflow.
+  |  |--download_bundles.sh           ## Script for downloading GATK-b37-bundle.
+  |--LICENSE                          ## Duh!
+  |--README.md                        ## Duh!
+  |--main.config                      ## User configuration file! All inputs, outputs and options GO HERE!! ONLY file that SHOULD be modified by user!
+  |--main.nf                          ## Main h3avarcall nextflow scripts.
+  |--nextflow.config                  ## Pipeline configuration file! DO NOT EDIT!!!
 ```
 
 ### 1.1. Download test datasets:
