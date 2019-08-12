@@ -48,7 +48,6 @@ wget ftp://ftp-trace.ncbi.nih.gov/giab/ftp/data/NA12878/Garvan_NA12878_HG001_HiS
 ### 1.2. Download the `Singularity` containers required to execute the pipeline:
 ```
 nextflow run main.nf -profile slurm --mode do.GetContainers
-
 ```
 
 ### 1.3. Download the GATK b37 bundle required to execute the workflow:
@@ -58,20 +57,29 @@ This step takes **FOREVER** to run - run it only once!
 nextflow run main.nf -profile slurm --mode do.GenomeIndexing
 ```
 
-## 2. QC & READ TRIMMING OF THE DATA
+## 2. Executing the main `h3avarcall` pipeline
 
-### 2.1. Perform QC on data (optional):
+### 2.1. Read QC (optional):
 ```
 nextflow run main.nf -profile slurm --mode do.QC
 ```
 
-#### 2.3. Perform trimming of the data (optional):
+#### 2.2. Read Trimming (optional):
 ```
-nextflow run main.nf -profile slurm --mode do.Trimming
+nextflow run main.nf -profile slurm --mode do.ReadTrimming
 ```
 
-## 3. ALIGNMENT OF DATA
-### 3.1. Perform alignment
+### 2.3. Read Alignment
+Can be run with `--from do.ReadTrimming` or `--from do.QC` depending on whether these step were run! 
 ```
-nextflow run main.nf -profile slurm --mode do.Alignment
+nextflow run main.nf -profile slurm --mode do.ReadAlignment
+```
+
+### 2.4. Variant Calling
+```
+nextflow run main.nf -profile slurm --mode do.VariantCalling --from do.ReadAlignment
+```
+### 2.5. Variant Filtering
+```
+nextflow run main.nf -profile slurm --mode do.VariantFiltering --from do.VariantCalling 
 ```
