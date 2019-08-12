@@ -106,12 +106,14 @@ nextflow run main.nf -profile slurm --mode do.ReadAlignment
 ```
 
 ### 2.4. Variant Calling
+Depends on Read Alignment STEP, therefore you **MUST** run STEP 3`(`--mode do.ReadAlignment`) before running this step.
 ```bash
-nextflow run main.nf -profile slurm --mode do.VariantCalling --from do.ReadAlignment
+nextflow run main.nf -profile slurm --mode do.VariantCalling 
 ```
 ### 2.5. Variant Filtering
+Depends on Variant Calling STEP, therefore you **MUST** run STEP 4`(`--mode do.VariantCalling`) before running this step.
 ```bash
-nextflow run main.nf -profile slurm --mode do.VariantFiltering --from do.VariantCalling 
+nextflow run main.nf -profile slurm --mode do.VariantFiltering 
 ```
 
 ## 3. `h3avarcall` results
