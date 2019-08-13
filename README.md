@@ -86,6 +86,11 @@ This step takes **FOREVER** to run - run it only once!
 ```bash
 nextflow run main.nf -profile slurm --mode do.GenomeIndexing
 ```
+If by some miracle you happen to have access to the WITS Cluster, you do not need to download the GATK-b37-bundle! Simply `cd` into the `gatk-b37-bundle` folder of the `h3avarcall` repo and soft-link the GATK-b37-bundle data as follows: 
+```
+cd gatk-b37-bundle
+ln -s /global/blast/gatk-bundle/b37/* .
+``
 
 ## 2. Executing the main `h3avarcall` pipeline
 
