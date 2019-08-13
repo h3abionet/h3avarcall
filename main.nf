@@ -33,7 +33,16 @@ var_filter_dir     = file("${out_dir}/5_Variant_Filtering", type: 'dir')
 if(mode == null || mode == 'do.GetContainers' || mode == 'do.GenomeIndexing' ) {
 } else if(mode == 'do.QC') {
     if(resume_from == null) {
-        read_pairs = Channel.fromFilePairs("${data_dir}/*{R,read}[1,2]*.{$ext}", type: 'file')
+        read_pairs = Channel.fromFilePairs("${data_dir}/*{RR,read}[1,2]*.{$ext}", type: 'file')
+            .ifEmpty{
+            error """
+=============================================================================================
+Ooops!! Looks like there's an ERROR in your input files! There are no FASTQ files in the directory:
+\t${data_dir}
+Please ensure that you have give the correct DIRECTORY for you FASTQ input files using the '--data' option!
+=============================================================================================
+                  """
+        }
     } else if(resume_from == 'do.Trimming') {
         read_pairs = Channel.fromFilePairs("${trim_dir}/*[1,2]P.{$ext}", type: 'file')
     } else {
@@ -44,7 +53,7 @@ if(mode == null || mode == 'do.GetContainers' || mode == 'do.GenomeIndexing' ) {
         println "\t[ do.ReadTrimming ]"
         println "Please use one of the above options, or leave the \'--from\' option out, so I can continue!"
         println "=============================================================================================\n"
-        exit 
+        exit 1
     }
 } else if(mode == 'do.Trimming') {
     if(resume_from == null) {
