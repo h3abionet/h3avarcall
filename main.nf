@@ -2,14 +2,14 @@
 
 // HELP MENU GOES HERE
 
-// SET PARAMETERS
+// STAGING INPUT FILES AND SETTING PARAMETERS FROM MAIN.CONFIG
 data_dir             = file(params.data, type: 'dir')
 out_dir              = file(params.out, type: 'dir')
 trim_params          = params.trim
 resources            = file(params.resources, type: 'dir')
 mode                 = params.mode
 resume_from          = params.from
-
+//==========
 b37_bundle           = file(params.bundle, type: 'file')
 genome               = file("${resources}/human_g1k_v37_decoy.fasta", type: 'file')
 dbsnp_sites          = file("${resources}/dbsnp_138.b37.vcf", type: 'file')
@@ -20,31 +20,61 @@ phase1_snps          = file("${resources}/1000G_phase1.snps.high_confidence.b37.
 golden_indels        = file("${resources}/Mills_and_1000G_gold_standard.indels.b37.vcf", type: 'file')
 ext                  = "fastq,fastq.gz,fastq.bz2,fq,fq.gz,fq.bz2"
 
-out_dir.mkdir()
-
 // OUTPUT DIRECTORIES
+out_dir.mkdir()
+//==========
 qc_dir             = file("${out_dir}/1_QC", type: 'dir') 
 trim_dir           = file("${out_dir}/2_Read_Trimming", type: 'dir') 
 align_dir          = file("${out_dir}/3_Read_Alignment", type: 'dir') 
 var_call_dir       = file("${out_dir}/4_Variant_Calling", type: 'dir') 
 var_filter_dir     = file("${out_dir}/5_Variant_Filtering", type: 'dir') 
 
-// GET DATA
-if(mode == null || mode == 'do.GetContainers' || mode == 'do.GenomeIndexing' ) {
-} else if(mode == 'do.QC') {
-    if(resume_from == null) {
-        read_pairs = Channel.fromFilePairs("${data_dir}/*{RR,read}[1,2]*.{$ext}", type: 'file')
-            .ifEmpty{
-            error """
+// INPUT ERROR MESSAGES!
+main_data_error  = """
 =============================================================================================
 Ooops!! Looks like there's an ERROR in your input files! There are no FASTQ files in the directory:
 \t${data_dir}
 Please ensure that you have give the correct DIRECTORY for you FASTQ input files using the '--data' option!
 =============================================================================================
-                  """
+"""
+trim_data_error  = """
+=============================================================================================
+Ooops!! Looks like there's an ERROR in your input files! There are no FASTQ files in the directory:
+\t${trim_dir}
+Are you sure you ran the READ TRIMMING STEP (--mode do.ReadTrimming) ??
+Please ensure that you have ran the READ TRIMMING STEP successfully and try again!
+=============================================================================================
+"""
+align_data_error ="""
+=============================================================================================
+Ooops!! Looks like there's an ERROR in your input files! There are no BAM files in the directory:
+\t${align_dir}
+Are you sure you ran the READ ALIGNMENT STEP (--mode do.ReadAlignment) ??
+Please ensure that you have ran the READ ALIGNMENT STEP successfully and try again!
+=============================================================================================
+"""
+call_data_error  = """
+=============================================================================================
+Ooops!! Looks like there's an ERROR in your input files! There are no GVCF files in the directory:
+\t${var_call_dir}
+Are you sure you ran the VARIANT CALLING STEP (--mode do.VariantCalling) ??
+Please ensure that you have ran the VARIANT CALLING STEP successfully and try again!
+=============================================================================================
+"""
+
+// GET DATA - SPIT OUT ERROR MESSAGES IF THERE IS SOMETHING WRONG WITH THE INPUT OR COMMAND OPTIONS
+if(mode == null || mode == 'do.GetContainers' || mode == 'do.GenomeIndexing' ) {
+} else if(mode == 'do.QC') {
+    if(resume_from == null) {
+        read_pairs = Channel.fromFilePairs("${data_dir}/*{RR,read}[1,2]*.{$ext}", type: 'file')
+            .ifEmpty {
+            error "$main_data_error"
         }
     } else if(resume_from == 'do.Trimming') {
         read_pairs = Channel.fromFilePairs("${trim_dir}/*[1,2]P.{$ext}", type: 'file')
+            .ifEmpty {
+            error "$trim_data_error"
+        }
     } else {
         println "\n============================================================================================="
         println "Ooops!! Looks like there's an ERROR in you command!"
@@ -55,11 +85,17 @@ Please ensure that you have give the correct DIRECTORY for you FASTQ input files
         println "=============================================================================================\n"
         exit 1
     }
-} else if(mode == 'do.Trimming') {
+} else if(mode == 'do.ReadTrimming') {
     if(resume_from == null) {
         read_pairs = Channel.fromFilePairs("${data_dir}/*{R,read}[1,2]*.{$ext}", type: 'file')
+            .ifEmpty {
+            error "$main_data_error"
+        }
     } else if(resume_from == 'do.QC') {
-        read_pairs = Channel.fromFilePairs("${trim_dir}/*[1,2]P.{$ext}", type: 'file')
+        read_pairs = Channel.fromFilePairs("${data_dir}/*{R,read}[1,2]*.{$ext}", type: 'file')
+            .ifEmpty {
+            error "$main_data_error"
+        }
     } else {
         println "\n============================================================================================="
         println "Ooops!! Looks like there's an ERROR in you command!"
@@ -70,11 +106,17 @@ Please ensure that you have give the correct DIRECTORY for you FASTQ input files
         println "=============================================================================================\n"
         exit 1
     }
-} else if(mode == 'do.Alignment') {
+} else if(mode == 'do.ReadAlignment') {
     if(resume_from == null || resume_from == 'do.QC') {
         read_pairs = Channel.fromFilePairs("${data_dir}/*{R,read}[1,2]*.{$ext}", type: 'file')
+            .ifEmpty {
+            error "$main_data_error"
+        }
     } else if(resume_from == 'do.Trimming') {
         read_pairs = Channel.fromFilePairs("${trim_dir}/*[1,2]P.{$ext}", type: 'file')
+            .ifEmpty {
+            error "$trim_data_error"
+        }
     } else {
         println "\n============================================================================================="
         println "Ooops!! Looks like there's an ERROR in you command!"
@@ -88,6 +130,9 @@ Please ensure that you have give the correct DIRECTORY for you FASTQ input files
 } else if(mode == 'do.VariantCalling') {
     if(resume_from == null || resume_from == 'do.Alignment') {
         bam_recal = Channel.fromFilePairs("${align_dir}/*_md.recal.{bai,bam}")
+            .ifEmpty {
+            error "$align_data_error"
+        }
     } else {
         println "\n============================================================================================="
         println "Ooops!! Looks like there's an ERROR in you command!"
@@ -101,6 +146,9 @@ Please ensure that you have give the correct DIRECTORY for you FASTQ input files
 } else if(mode == 'do.VariantFiltering') {
     if(resume_from == null || resume_from == 'do.VariantCalling') {
         genotype_vcf_list = Channel.fromFilePairs("${var_call_dir}/*genotyped.vcf.{gz,gz.tbi}", size: -1) { it -> "${it.name.substring(0,3)}" }
+            .ifEmpty {
+            error "$call_data_error"
+        }
     } else {
         println "\n============================================================================================="
         println "Ooops!! Looks like there's an ERROR in you command!"
@@ -124,10 +172,8 @@ Please ensure that you have give the correct DIRECTORY for you FASTQ input files
 
 // START PROCESSING READS
 switch (mode) {
-        // Download the Singularity images required to execute this workflow! 
+        // PREPROCESSING - DOWNLOAD THE SINGULARITY IMAGES REQUIRED TO EXECUTE THIS WORKFLOW!
     case['do.GetContainers']:
-        println "\nDownloading Singularity containers."
-        
         base = "shub://h3abionet/h3avarcall:"
         shub_images = Channel.from( ["${base}gatk", "${base}bwa", "${base}trimmomatic", "${base}fastqc"] )
         
@@ -151,9 +197,8 @@ switch (mode) {
         break
         // --------------------
         
+        // PREPROCESSING - DOWNLOAD GATK-B37-BUNDLE (ONLY THE NECESSARY FILES) AND INDEX GENOME WITH BWA. 
     case['do.GenomeIndexing']:
-        println "\nDownloading reference genome and indexing"
-
         process run_GenomeIndexing {
             label 'bwa'
             cpus 1
@@ -172,9 +217,8 @@ switch (mode) {
         break
         // --------------------
 
+        // MAIN WORKFLOW - STEP 1 (OPTIONAL): PERFORM QC ON INPUT FASTQ FILES! 
     case['do.QC']:
-        println "\nPerforming QC for all the samples"
-        
         process run_QualityChecks {
             label 'fastqc'
             cpus 11
@@ -198,6 +242,7 @@ switch (mode) {
         break
         // --------------------
 
+        // MAIN WORKFLOW - STEP 2 (OPTIONAL): TRIMMING OF INPUT FASTQ FILES
     case['do.Trimming']:
         println "Performing trimming for all the samples"
 
@@ -227,6 +272,7 @@ switch (mode) {
         break
         // --------------------        
         
+        // MAIN WORKFLOW - STEP 3 (COMPULSORY): ALIGNMENT OF FASTQ FILES TO THE REFERENCE GENOME
     case['do.Alignment']:
         println "Performing alignment for all the samples"
 
@@ -346,11 +392,9 @@ switch (mode) {
         break
         // --------------------
 
+        // MAIN WORKFLOW - STEP 4 (COMPULSORY): VARIANT CALLING ON ALIGNED/MARKDUPLICATE/RECALIBRATED BAM FILES
     case['do.VariantCalling']:
-        println "Performing something for all the samples"    
-
         chromosomes = Channel.from ( 1..22 )
-
         process run_HaplotypeCaller {
             label 'gatk'
             cpus 1
@@ -433,17 +477,19 @@ switch (mode) {
         """
         }
         
+        // ====================== COLLECTION =========================== 
         genotype_vcfs_chrom
             .groupTuple(by: 0, sort: 'true')
             .set { genotype_vcf_list }
+        // ====================== COLLECTION =========================== 
 
         break
         // --------------------
         
+        // MAIN WORKFLOW - STEP 5 (COMPULSORY): VARIANT FILTERING ON gVCF
     case['do.VariantFiltering']:
         println "Performing something for all the samples"        
         
-        // GATHER!
         process run_CombineChromVCFs {
             label 'gatk'
             cpus 1
