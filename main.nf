@@ -65,7 +65,7 @@ Please ensure that you have ran the VARIANT CALLING STEP successfully and try ag
 multi_qc_error = """
 =============================================================================================
 Ooops!! Looks like there's an ERROR in your input files! There are NO FILES in the directory:
-\t${out_path}
+\t${out_dir}
 You are trying to run MultiQC, but it seems like you have NO OUTPUT FILES, most probably because you haven't run any step of the workflow!
 Please ensure that you have ran at least ONE STEP of the workflow successfully and try again!
 =============================================================================================
@@ -169,7 +169,7 @@ if(mode == null || mode == 'do.GetContainers' || mode == 'do.GenomeIndexing' ) {
         exit 1
     }
 } else if(mode == 'do.MultiQC') {
-    multi_qc = Channel.fromPath("${out_path}")
+    multi_qc = Channel.fromPath("${out_dir}")
         .ifEmpty {
         error "$multi_qc_error"
     }
@@ -189,7 +189,7 @@ switch (mode) {
         // PREPROCESSING - DOWNLOAD THE SINGULARITY IMAGES REQUIRED TO EXECUTE THIS WORKFLOW!
     case['do.GetContainers']:
         base = "shub://h3abionet/h3avarcall:"
-        shub_images = Channel.from( ["${base}gatk", "${base}bwa", "${base}trimmomatic", "${base}fastqc"] )
+        shub_images = Channel.from( ["${base}gatk", "${base}bwa", "${base}trimmomatic", "${base}fastqc", "${base}multiqc"] )
         
         process run_DownloadContainers {
             label 'noimage'
@@ -543,7 +543,7 @@ switch (mode) {
 
             output:
             set val("genome"), file(list_vcf), file("*.{recal,recal.idx,tranches}") into vqsr_indel_recal
-            file("vsqr_indels.plots.R") into vsqr_indels_plots
+
         """
         gatk --java-options \"-Xmx${task.memory.toGiga()}G\" VariantRecalibrator \
             -R ${genome} \
