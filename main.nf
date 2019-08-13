@@ -18,60 +18,99 @@ omni                 = file("${resources}/1000G_omni2.5.b37.vcf", type: 'file')
 phase1_indels        = file("${resources}/1000G_phase1.indels.b37.vcf", type: 'file')
 phase1_snps          = file("${resources}/1000G_phase1.snps.high_confidence.b37.vcf", type: 'file')
 golden_indels        = file("${resources}/Mills_and_1000G_gold_standard.indels.b37.vcf", type: 'file')
+ext                  = "fastq,fastq.gz,fastq.bz2,fq,fq.gz,fq.bz2"
 
 out_dir.mkdir()
 
-// // GET DATA
-if(mode == null){
-    
-} else if(mode == 'do.GetContainers') {
-    
-} else if(mode == 'do.GenomeIndexing') {
-    
+// OUTPUT DIRECTORIES
+qc_dir             = file("${out_dir}/1_QC", type: 'dir') 
+trim_dir           = file("${out_dir}/2_Read_Trimming", type: 'dir') 
+align_dir          = file("${out_dir}/3_Read_Alignment", type: 'dir') 
+var_call_dir       = file("${out_dir}/4_Variant_Calling", type: 'dir') 
+var_filter_dir     = file("${out_dir}/5_Variant_Filtering", type: 'dir') 
+
+// GET DATA
+if(mode == null || mode == 'do.GetContainers' || mode == 'do.GenomeIndexing' ) {
 } else if(mode == 'do.QC') {
     if(resume_from == null) {
-        read_pairs = Channel.fromFilePairs("${data_dir}/*{R,read}[1,2]*.{fastq,fastq.gz,fastq.bz2,fq,fq.gz,fq.bz2}", type: 'file')
+        read_pairs = Channel.fromFilePairs("${data_dir}/*{R,read}[1,2]*.{$ext}", type: 'file')
     } else if(resume_from == 'do.Trimming') {
-        read_pairs = Channel.fromFilePairs("${out_dir}/2_Read_Trimming/*{R,read,P}[1,2]*.{fastq,fastq.gz,fastq.bz2,fq,fq.gz,fq.bz2}", type: 'file')
+        read_pairs = Channel.fromFilePairs("${trim_dir}/*[1,2]P.{$ext}", type: 'file')
     } else {
-        exit 1,"DAMMIT DUDE, DO READ ALIGNMENT!!"
+        println "\n============================================================================================="
+        println "Ooops!! Looks like there's an ERROR in you command!"
+        println "I do not recognise the \'--from ${resume_from}\' option you have given me!"
+        println "The allowed options for \'--from\' that can be used with \'--mode ${mode}\' are:"
+        println "\t[ do.ReadTrimming ]"
+        println "Please use one of the above options, or leave the \'--from\' option out, so I can continue!"
+        println "=============================================================================================\n"
+        exit 1
     }
 } else if(mode == 'do.Trimming') {
     if(resume_from == null) {
-        read_pairs = Channel.fromFilePairs("${data_dir}/*{R,read}[1,2]*.{fastq,fastq.gz,fastq.bz2,fq,fq.gz,fq.bz2}", type: 'file')
+        read_pairs = Channel.fromFilePairs("${data_dir}/*{R,read}[1,2]*.{$ext}", type: 'file')
     } else if(resume_from == 'do.QC') {
-        read_pairs = Channel.fromFilePairs("${out_dir}/2_Read_Trimming/*{R,read,P}[1,2]*.{fastq,fastq.gz,fastq.bz2,fq,fq.gz,fq.bz2}", type: 'file')
+        read_pairs = Channel.fromFilePairs("${trim_dir}/*[1,2]P.{$ext}", type: 'file')
     } else {
-        exit 1,"DAMMIT DUDE, DO READ ALIGNMENT!!"
+        println "\n============================================================================================="
+        println "Ooops!! Looks like there's an ERROR in you command!"
+        println "I do not recognise the \'--from ${resume_from}\' option you have given me!"
+        println "The allowed options for \'--from\' that can be used with \'--mode ${mode}\' are:"
+        println "\t[ do.QC ]"
+        println "Please use one of the above options, or leave the \'--from\' option out, so I can continue!"
+        println "=============================================================================================\n"
+        exit 1
     }
 } else if(mode == 'do.Alignment') {
-    if(resume_from == null) {
-        read_pairs = Channel.fromFilePairs("${data_dir}/*{R,read}[1,2]*.{fastq,fastq.gz,fastq.bz2,fq,fq.gz,fq.bz2}", type: 'file')
-    } else if(resume_from == 'do.QC') {
-        read_pairs = Channel.fromFilePairs("${data_dir}/*{R,read}[1,2]*.{fastq,fastq.gz,fastq.bz2,fq,fq.gz,fq.bz2}", type: 'file')
+    if(resume_from == null || resume_from == 'do.QC') {
+        read_pairs = Channel.fromFilePairs("${data_dir}/*{R,read}[1,2]*.{$ext}", type: 'file')
     } else if(resume_from == 'do.Trimming') {
-        read_pairs = Channel.fromFilePairs("${out_dir}/2_Read_Trimming/*[1,2]P.{fastq,fastq.gz,fastq.bz2,fq,fq.gz,fq.bz2}", type: 'file')
+        read_pairs = Channel.fromFilePairs("${trim_dir}/*[1,2]P.{$ext}", type: 'file')
     } else {
-        exit 1,"DAMMIT DUDE, DO READ ALIGNMENT!!"
+        println "\n============================================================================================="
+        println "Ooops!! Looks like there's an ERROR in you command!"
+        println "I do not recognise the \'--from ${resume_from}\' option you have given me!"
+        println "The allowed options for \'--from\' that can be used with \'--mode ${mode}\' are:"
+        println "\t[ do.QC | do.Trimming ]"
+        println "Please use one of the above options, or leave the \'--from\' option out, so I can continue!"
+        println "=============================================================================================\n"
+        exit 1
     }
 } else if(mode == 'do.VariantCalling') {
-    if(resume_from == null) {
-        bam_recal = Channel.fromFilePairs("${out_dir}/3_Read_Alignment/*_md.recal.{bai,bam}")
-    } else if(resume_from == 'do.Alignment') {
-        bam_recal = Channel.fromFilePairs("${out_dir}/3_Read_Alignment/*_md.recal.{bai,bam}")
+    if(resume_from == null || resume_from == 'do.Alignment') {
+        bam_recal = Channel.fromFilePairs("${align_dir}/*_md.recal.{bai,bam}")
     } else {
-        exit 1, "DAMMIT DUDE, DO READ ALIGNMENT!!"
+        println "\n============================================================================================="
+        println "Ooops!! Looks like there's an ERROR in you command!"
+        println "I do not recognise the \'--from ${resume_from}\' option you have given me!"
+        println "The allowed options for \'--from\' that can be used with \'--mode ${mode}\' are:"
+        println "\t[ do.Alignment ]"
+        println "Please us the above option to resume from the ALIGNMENT STEP!"
+        println "=============================================================================================\n"
+        exit 1
     }
 } else if(mode == 'do.VariantFiltering') {
-    if(resume_from == null) {
-        genotype_vcf_list = Channel.fromFilePairs("${out_dir}/4_Variant_Calling/*genotyped.vcf.{gz,gz.tbi}", size: -1) { it -> "${it.name.substring(0,3)}" }
-    } else if(resume_from == 'do.VariantCalling') {
-        genotype_vcf_list = Channel.fromFilePairs("${out_dir}/4_Variant_Calling/*genotyped.vcf.{gz,gz.tbi}", size: -1) { it -> "${it.name.substring(0,3)}" }
+    if(resume_from == null || resume_from == 'do.VariantCalling') {
+        genotype_vcf_list = Channel.fromFilePairs("${var_call_dir}/*genotyped.vcf.{gz,gz.tbi}", size: -1) { it -> "${it.name.substring(0,3)}" }
     } else {
-        exit 1,"DAMMIT DUDE, DO READ ALIGNMENT!!"
+        println "\n============================================================================================="
+        println "Ooops!! Looks like there's an ERROR in you command!"
+        println "I do not recognise the \'--from ${resume_from}\' option you have given me!"
+        println "The allowed options for \'--from\' that can be used with \'--mode ${mode}\' are:"
+        println "\t[ do.VariantCalling ]"
+        println "Please use the above option to resume from the VARIANT CALLING STEP!"
+        println "=============================================================================================\n"
+        exit 1
     }
 } else {
-    
+    println "\n============================================================================================="
+    println "Ooops!! Looks like there's an ERROR in you command!"
+    println "I do not recognise the \'--mode ${mode}\' option you have given me!"
+    println "The allowed options for \'--from\' that can be used with \'--mode ${mode}\' are:"
+    println "\t[ do.GetContainers | do.GenomeIndexing | do.QC | do.ReadTrimming | do.ReadAlignment | do.VarianCalling | do.VariantFiltering ]"
+    println "Please us the above option to resume from the VARIANT CALLING STEP!"
+    println "=============================================================================================\n"
+    exit 1
 }
 
 // START PROCESSING READS
@@ -133,7 +172,7 @@ switch (mode) {
             memory '10 GB'
             time '2h'
             tag { sample }
-            publishDir "$out_dir/1_QC", mode: 'copy', overwrite: true
+            publishDir "${qc_dir}", mode: 'copy', overwrite: true
             
             input:
             set sample, file(reads) from read_pairs
@@ -159,7 +198,7 @@ switch (mode) {
             memory '50 GB'
             time '2h'
             tag { sample }
-            publishDir "$out_dir/2_Read_Trimming", mode: 'copy', overwrite: true
+            publishDir "${trim_dir}", mode: 'copy', overwrite: true
             
             input:
             set sample, file(reads) from read_pairs
@@ -257,7 +296,7 @@ switch (mode) {
             memory '5 GB'
             time '2h'
             tag { sample }
-            publishDir "$out_dir/3_Read_Alignment", mode: 'copy', overwrite: true
+            publishDir "${align_dir}", mode: 'copy', overwrite: true
             
             input:
             set sample, file(list_bam), file(table) from recal_table
@@ -366,7 +405,7 @@ switch (mode) {
             memory '10 GB'
             time '2h'
             tag { "chr_${chrom}" }
-            publishDir "$out_dir/4_Variant_Calling", mode: 'copy', overwrite: true
+            publishDir "${var_call_dir}", mode: 'copy', overwrite: true
             
             input:
             set chrom, file(list_gvcf) from gvcfs_chrom
@@ -452,7 +491,7 @@ switch (mode) {
             memory '10 GB'
             time '2h'
             tag { "Genome" }
-            publishDir "$out_dir/5_Variant_Filtering", mode: 'copy', overwrite: true
+            publishDir "${var_filter_dir}", mode: 'copy', overwrite: true
 
             input:
             set tuple_name, file(list_vcf), file(list_recal) from vqsr_snp_recal
@@ -504,7 +543,7 @@ switch (mode) {
             memory '10 GB'
             time '2h'
             tag { "Genome" }
-            publishDir "$out_dir/5_Variant_Filtering", mode: 'copy', overwrite: true
+            publishDir "${var_filter_dir}", mode: 'copy', overwrite: true
 
             input:
             set tumple_name, file(list_vcf), file(list_recal) from vqsr_indel_recal
