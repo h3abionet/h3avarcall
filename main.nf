@@ -44,7 +44,7 @@ if(mode == null || mode == 'do.GetContainers' || mode == 'do.GenomeIndexing' ) {
         println "\t[ do.ReadTrimming ]"
         println "Please use one of the above options, or leave the \'--from\' option out, so I can continue!"
         println "=============================================================================================\n"
-        exit 1
+        exit 
     }
 } else if(mode == 'do.Trimming') {
     if(resume_from == null) {
