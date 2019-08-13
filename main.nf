@@ -238,7 +238,8 @@ switch (mode) {
             
             output:
             set sample, file("${sample}*.html") into qc_html
-            
+            set sample, file("${sample}*.zip") into qc_multiqc
+
             """
             fastqc ${reads.get(0)} ${reads.get(1)} \
                 --threads ${task.cpus} \
@@ -260,7 +261,8 @@ switch (mode) {
             
             output:
             set sample, file("${sample}*{1,2}P*") into read_pairs_trimmed
-            
+            set sample, file("trimlog_${sample}.log") into trim_multiqc
+
             """
             java -jar /opt/Trimmomatic-0.39/trimmomatic-0.39.jar PE \
                 -threads ${task.cpus} \
@@ -347,7 +349,7 @@ switch (mode) {
 
             output:
             set sample, file("${sample}_md.recal.{bam,bai}") into bam_recal, bam_recal_stats
-            
+
             """
             gatk --java-options \"-Xmx${task.memory.toGiga()}G\" ApplyBQSR \
                  --input ${list_bam.find { it =~ '_md.bam$' } } \
@@ -367,7 +369,7 @@ switch (mode) {
             set sample, file(list_bam) from bam_recal_stats
 
             output:
-            set sample, file("${sample}_md.recal.stats")  into samtools_stats
+            set sample, file("${sample}_md.recal.stats")  into samtools_stats, samtools_multiqc
 
             """
             samtools stats \
