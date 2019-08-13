@@ -28,6 +28,7 @@ trim_dir           = file("${out_dir}/2_Read_Trimming", type: 'dir')
 align_dir          = file("${out_dir}/3_Read_Alignment", type: 'dir') 
 var_call_dir       = file("${out_dir}/4_Variant_Calling", type: 'dir') 
 var_filter_dir     = file("${out_dir}/5_Variant_Filtering", type: 'dir') 
+multi_qc_dir       = file("${out_dir}/MultiQC", type: 'dir') 
 
 // INPUT ERROR MESSAGES!
 main_data_error  = """
@@ -61,12 +62,20 @@ Are you sure you ran the VARIANT CALLING STEP (--mode do.VariantCalling) ??
 Please ensure that you have ran the VARIANT CALLING STEP successfully and try again!
 =============================================================================================
 """
+multi_qc_error = """
+=============================================================================================
+Ooops!! Looks like there's an ERROR in your input files! There are NO FILES in the directory:
+\t${out_path}
+You are trying to run MultiQC, but it seems like you have NO OUTPUT FILES, most probably because you haven't run any step of the workflow!
+Please ensure that you have ran at least ONE STEP of the workflow successfully and try again!
+=============================================================================================
+"""
 
 // GET DATA - SPIT OUT ERROR MESSAGES IF THERE IS SOMETHING WRONG WITH THE INPUT OR COMMAND OPTIONS
 if(mode == null || mode == 'do.GetContainers' || mode == 'do.GenomeIndexing' ) {
 } else if(mode == 'do.QC') {
     if(resume_from == null) {
-        read_pairs = Channel.fromFilePairs("${data_dir}/*{RR,read}[1,2]*.{$ext}", type: 'file')
+        read_pairs = Channel.fromFilePairs("${data_dir}/*{R,read}[1,2]*.{$ext}", type: 'file')
             .ifEmpty {
             error "$main_data_error"
         }
@@ -159,6 +168,11 @@ if(mode == null || mode == 'do.GetContainers' || mode == 'do.GenomeIndexing' ) {
         println "=============================================================================================\n"
         exit 1
     }
+} else if(mode == 'do.MultiQC') {
+    multi_qc = Channel.fromPath("${out_path}")
+        .ifEmpty {
+        error "$multi_qc_error"
+    }
 } else {
     println "\n============================================================================================="
     println "Ooops!! Looks like there's an ERROR in you command!"
@@ -178,9 +192,7 @@ switch (mode) {
         shub_images = Channel.from( ["${base}gatk", "${base}bwa", "${base}trimmomatic", "${base}fastqc"] )
         
         process run_DownloadContainers {
-            cpus 1
-            memory '2 GB'
-            time '2h'
+            label 'noimage'
             tag { "Downloading: $link" }
             publishDir "$baseDir/containers", mode: 'copy', overwrite: true
             
@@ -201,9 +213,6 @@ switch (mode) {
     case['do.GenomeIndexing']:
         process run_GenomeIndexing {
             label 'bwa'
-            cpus 1
-            memory '5 GB'
-            time '2h'
             tag { sample }
             publishDir "$baseDir/resources", mode: 'copy', overwrite: true
             
@@ -221,9 +230,6 @@ switch (mode) {
     case['do.QC']:
         process run_QualityChecks {
             label 'fastqc'
-            cpus 11
-            memory '10 GB'
-            time '2h'
             tag { sample }
             publishDir "${qc_dir}", mode: 'copy', overwrite: true
             
@@ -235,7 +241,7 @@ switch (mode) {
             
             """
             fastqc ${reads.get(0)} ${reads.get(1)} \
-                --threads 10 \
+                --threads ${task.cpus} \
                 --noextract
             """
         }
@@ -243,14 +249,9 @@ switch (mode) {
         // --------------------
 
         // MAIN WORKFLOW - STEP 2 (OPTIONAL): TRIMMING OF INPUT FASTQ FILES
-    case['do.Trimming']:
-        println "Performing trimming for all the samples"
-
+    case['do.ReadTrimming']:
         process run_ReadTrimming {
             label 'trimmomatic'
-            cpus 11
-            memory '50 GB'
-            time '2h'
             tag { sample }
             publishDir "${trim_dir}", mode: 'copy', overwrite: true
             
@@ -262,7 +263,7 @@ switch (mode) {
             
             """
             java -jar /opt/Trimmomatic-0.39/trimmomatic-0.39.jar PE \
-                -threads 10 \
+                -threads ${task.cpus} \
                 -trimlog trimlog_${sample}.log \
                 -basein ${reads.get(0)} \
                 -baseout ${sample}_trimmed.fastq.gz \
@@ -273,14 +274,11 @@ switch (mode) {
         // --------------------        
         
         // MAIN WORKFLOW - STEP 3 (COMPULSORY): ALIGNMENT OF FASTQ FILES TO THE REFERENCE GENOME
-    case['do.Alignment']:
+    case['do.ReadAlignment']:
         println "Performing alignment for all the samples"
 
         process run_ReadAlignment {
             label 'bwa'
-            cpus 11
-            memory '50 GB'
-            time '2h'
             tag { sample }
             
             input:
@@ -291,7 +289,7 @@ switch (mode) {
             
             """
             bwa mem -R \"@RG\\tID:${sample}\\tLB:LIBA\\tSM:${sample}\\tPL:Illumina\" \
-                -t 10 -M ${genome} \
+                -t ${task.cpus} -M ${genome} \
                 ${reads.get(0)} ${reads.get(1)} | samtools sort \
                 --threads 10 - > ${sample}.bam
             """
@@ -299,9 +297,6 @@ switch (mode) {
 
         process run_MarkDuplicates {
             label 'gatk'
-            cpus 8
-            memory '5 GB'
-            time '2h'
             tag { sample }
             
             input:
@@ -311,7 +306,7 @@ switch (mode) {
             set sample, file("${sample}_md.{bam,bai}") into bam_md
 
             """
-            gatk --java-options \"-Xmx4G\" MarkDuplicates \
+            gatk --java-options \"-Xmx${task.memory.toGiga()}G\" MarkDuplicates \
                 --MAX_RECORDS_IN_RAM 50000 \
                 --INPUT ${list.find { it =~ '.bam$' } } \
                 --METRICS_FILE ${sample}.metrics \
@@ -323,9 +318,6 @@ switch (mode) {
 
         process run_CreateRecalibrationTable {
             label 'gatk'
-            cpus 2
-            memory '5 GB'
-            time '2h'
             tag { sample }
             
             input:
@@ -335,7 +327,7 @@ switch (mode) {
             set sample, file(list_bam), file("${sample}_recal.table") into recal_table 
 
             """
-            gatk --java-options \"-Xmx4G\" BaseRecalibrator \
+            gatk --java-options \"-Xmx${task.memory.toGiga()}G\" BaseRecalibrator \
                 --input ${list_bam.find { it =~ '_md.bam$' } } \
                 --output ${sample}_recal.table \
                 -R ${genome} \
@@ -347,9 +339,6 @@ switch (mode) {
   
         process run_RecalibrateBAM {
             label 'gatk'
-            cpus 8
-            memory '5 GB'
-            time '2h'
             tag { sample }
             publishDir "${align_dir}", mode: 'copy', overwrite: true
             
@@ -360,7 +349,7 @@ switch (mode) {
             set sample, file("${sample}_md.recal.{bam,bai}") into bam_recal, bam_recal_stats
             
             """
-            gatk --java-options \"-Xmx4G\" ApplyBQSR \
+            gatk --java-options \"-Xmx${task.memory.toGiga()}G\" ApplyBQSR \
                  --input ${list_bam.find { it =~ '_md.bam$' } } \
                  --output ${sample}_md.recal.bam \
                  -R ${genome} \
@@ -371,9 +360,6 @@ switch (mode) {
 
         process run_SamtoolsStats {
             label 'bwa'
-            cpus 11
-            memory '50 GB'
-            time '2h'
             tag { sample }
             publishDir "$out_dir/3_Read_Alignment", mode: 'copy', overwrite: true
             
@@ -385,7 +371,7 @@ switch (mode) {
 
             """
             samtools stats \
-                --threads 10 \
+                --threads ${task.cpus} \
                 ${list_bam.find { it =~ '_md.recal.bam$' } } > ${sample}_md.recal.stats
             """
         }
@@ -397,9 +383,6 @@ switch (mode) {
         chromosomes = Channel.from ( 1..22 )
         process run_HaplotypeCaller {
             label 'gatk'
-            cpus 1
-            memory '10 GB'
-            time '5h'
             tag { "${sample}_chr_${chrom}" }
             
             input:
@@ -410,7 +393,7 @@ switch (mode) {
             set val("chr_${chrom}"), file("*.g.vcf.{gz,gz.tbi}") into haplotype_calls mode flatten
             
             """
-            gatk --java-options \"-Xmx8G\" HaplotypeCaller \
+            gatk --java-options \"-Xmx${task.memory.toGiga()}G\" HaplotypeCaller \
                 -R ${genome} \
                 -I ${list_bam.find { it =~ '_md.recal.bam$' } } \
                 --emit-ref-confidence GVCF \
@@ -432,9 +415,6 @@ switch (mode) {
                 
         process run_CombineGVCF {
             label 'gatk'
-            cpus 1
-            memory '10 GB'
-            time '2h'
             tag { "chr_${chrom}" }
             
             input:
@@ -444,7 +424,7 @@ switch (mode) {
             set chrom, file("*.g.vcf.{gz,gz.tbi}") into gvcfs_chrom
             
         """
-        gatk --java-options \"-Xmx4G\" CombineGVCFs \
+        gatk --java-options \"-Xmx${task.memory.toGiga()}G\" CombineGVCFs \
             -R ${genome} \
             -L ${chrom.substring(4,)} \
             -V ${list_gvcf.findAll { it =~ '.g.vcf.gz$' }.join(' -V ') } \
@@ -454,9 +434,6 @@ switch (mode) {
         
         process run_GenotypeGVCF {
             label 'gatk'
-            cpus 1
-            memory '10 GB'
-            time '2h'
             tag { "chr_${chrom}" }
             publishDir "${var_call_dir}", mode: 'copy', overwrite: true
             
@@ -467,7 +444,7 @@ switch (mode) {
             set val("genome"), file("*.vcf.{gz,gz.tbi}") into genotype_vcfs_chrom mode flatten
 
         """
-        gatk --java-options \"-Xmx4G\" GenotypeGVCFs \
+        gatk --java-options \"-Xmx${task.memory.toGiga()}G\" GenotypeGVCFs \
             -R ${genome} \
             -L ${chrom.substring(4,)} \
             -V ${list_gvcf.findAll { it =~ '.g.vcf.gz$' }.join() } \
@@ -492,9 +469,6 @@ switch (mode) {
         
         process run_CombineChromVCFs {
             label 'gatk'
-            cpus 1
-            memory '10 GB'
-            time '2h'
             tag { "Genome" }
             
             input:
@@ -504,7 +478,7 @@ switch (mode) {
             file("genome.vcf.{gz,gz.tbi}") into genome_genotype_vcf
             
         """
-        gatk --java-options \"-Xmx8G\" GatherVcfs \
+        gatk --java-options \"-Xmx${task.memory.toGiga()}G\" GatherVcfs \
             -R ${genome} \
             -I ${list_vcf.findAll { it =~ '.vcf.gz$' }.collect { (it=~/\d+|\D+/).findAll() }.toSorted().collect{ it.join() }.join(' -I ') } \
             -O "genome.vcf.gz"
@@ -514,19 +488,16 @@ switch (mode) {
 
         process run_VQSRonSNPs {
             label 'gatk'
-            cpus 1
-            memory '10 GB'
-            time '2h'
             tag { "Genome" }
 
             input:
             file(list_vcf) from genome_genotype_vcf
 
             output:
-            set val("genome"), file(list_vcf), file("*.{recal,recal.idx,tranches}") into vqsr_snp_recal 
+            set val("genome"), file(list_vcf), file("*.{recal,recal.idx,tranches}") into vqsr_snp_recal
 
         """
-        gatk --java-options \"-Xmx8G\" VariantRecalibrator \
+        gatk --java-options \"-Xmx${task.memory.toGiga()}G\" VariantRecalibrator \
             -R ${genome} \
             -resource:hapmap,known=false,training=true,truth=true,prior=15.0 ${hapmap} \
             -resource:omni,known=false,training=true,truth=true,prior=12.0 ${omni} \
@@ -542,9 +513,6 @@ switch (mode) {
 
         process run_ApplyVQSRonSNPs {
             label 'gatk'
-            cpus 1
-            memory '10 GB'
-            time '2h'
             tag { "Genome" }
             publishDir "${var_filter_dir}", mode: 'copy', overwrite: true
 
@@ -555,7 +523,7 @@ switch (mode) {
             file("genome.SNP-recal.vcf.{gz,gz.tbi}") into vqsr_snp_apply
 
         """
-        gatk --java-options \"-Xmx8G\" ApplyVQSR \
+        gatk --java-options \"-Xmx${task.memory.toGiga()}G\" ApplyVQSR \
             -R ${genome} \
             --recal-file ${list_recal.find { it =~ '.recal$' } } \
             --tranches-file ${list_recal.find { it =~ '.tranches$' } } \
@@ -568,9 +536,6 @@ switch (mode) {
 
         process run_VQSRonINDELs {
             label 'gatk'
-            cpus 1
-            memory '10 GB'
-            time '2h'
             tag { "Genome" }
 
             input:
@@ -578,9 +543,9 @@ switch (mode) {
 
             output:
             set val("genome"), file(list_vcf), file("*.{recal,recal.idx,tranches}") into vqsr_indel_recal
-
+            file("vsqr_indels.plots.R") into vsqr_indels_plots
         """
-        gatk --java-options \"-Xmx8G\" VariantRecalibrator \
+        gatk --java-options \"-Xmx${task.memory.toGiga()}G\" VariantRecalibrator \
             -R ${genome} \
             -resource:mills,known=false,training=true,truth=true,prior=12.0 ${golden_indels} \
             -resource:dbsnp,known=true,training=false,truth=false,prior=2.0 ${dbsnp_sites} \
@@ -594,9 +559,6 @@ switch (mode) {
 
         process run_ApplyVQSRonINDELs {
             label 'gatk'
-            cpus 1
-            memory '10 GB'
-            time '2h'
             tag { "Genome" }
             publishDir "${var_filter_dir}", mode: 'copy', overwrite: true
 
@@ -607,7 +569,7 @@ switch (mode) {
             file("genome.SNP-recal.INDEL-recal.vcf.{gz,gz.tbi}") into vqsr_indel_apply
 
         """
-        gatk --java-options \"-Xmx8G\" ApplyVQSR \
+        gatk --java-options \"-Xmx${task.memory.toGiga()}G\" ApplyVQSR \
             -R ${genome} \
             --recal-file ${list_recal.find { it =~ '.recal$' } } \
             --tranches-file ${list_recal.find { it =~ '.tranches$' } } \
@@ -617,4 +579,24 @@ switch (mode) {
             -O genome.SNP-recal.INDEL-recal.vcf.gz
         """
         }
+        break
+        // --------------------
+        
+    case['do.MultiQC']:
+        process run_MultiQC {
+            tag { sample }
+            publishDir "${multi_qc_dir}", mode: 'copy', overwrite: true
+            
+            input:
+            file(folder) from multi_qc
+            
+            output:
+            file("*") into multi_qc_output
+            
+            """
+            multiqc ${folder}
+            """
+        }
+        break
+        // --------------------        
 }

@@ -33,7 +33,7 @@ The `main.config` file:
  * data         : Path to where the data is (FASTQ files).
  * out          : Path to store output results.
  * bundle       : GATK-b37-bundle list file.
- * mode         : Worflow step to perform. Can be any of [ do.GetContainers | do.GenomeIndexing | do.QC | do.ReadTrimming | do.ReadAlignment | do.VarianCalling | do.VariantFiltering ].
+ * mode         : Worflow step to perform. Can be any of [ do.GetContainers | do.GenomeIndexing | do.QC | do.ReadTrimming | do.ReadAlignment | do.VarianCalling | do.VariantFiltering | do.MultiQC].
  * trim         : Trimming options for Trimmomatic.
  * resources    : Location of the GATK-b37-bundle folder.
  * from         : Workflow step to resume workflow from. Can be any of [ do.QC | do.ReadTrimming | do.ReadAlignment | do.VarianCalling | do.VariantFiltering ].
@@ -120,6 +120,11 @@ Depends on Variant Calling STEP! **MUST** run STEP 2.4 (`--mode do.VariantCallin
 ```bash
 nextflow run main.nf -profile slurm --mode do.VariantFiltering 
 ```
+### 2.6. Workflow QC (MultiQC - Optional)
+Depends on at lease ONE step of the workflow to be executed!
+```bash
+nextflow run main.nf -profile slurm --mode do.MultiQC 
+```
 
 ## 3. `h3avarcall` results
 Assuming the output folder was left as default (in the `main.config` file), the results for running the `h3avarcall` will be found in the `results` folder of the `h3avarcall` repository. The results for each of the main workflow steps (`2.1` - `2.5`) are grouped as follows:
@@ -129,6 +134,7 @@ Assuming the output folder was left as default (in the `main.config` file), the 
 - [3] Read Alignment             =>    `results/3_Read_Alignment`
 - [4] Variant Calling            =>    `results/4_Variant_Calling`
 - [5] Variant Filtering          =>    `results/5_Variant_Filtering`
+- [6] MultiQC                    =>    `results/MultiQC`
 ```
 
 Nested withing these results folders are ouput files from each step of the workflow, including a folder "`workflow_report`" containing `h3avarcall_report.html`, `h3avarcall_timeline.html`, `h3avarcall_workflow.dot` and `h3avarcall_trace.txt` that contain detailed information on the resources (CPU, MEMORY and TIME) usage of each process in the steps. The `results` directory structure within `h3avarcall` repository can be summarized as below:
@@ -176,6 +182,9 @@ h3avarcall
   |  |  |  |--h3avarcall_trace.txt
   |  |  |--genome.SNP-recal.vcf.gz
   |  |  |--genome.SNP-recal.vcf.gz.tbi
+  |  |--MultiQC
+  |  |  |--multiqc_data
+  |  |  |--multiqc_report.html
   |--work
   |  |--<There's a lot of folders here! Lets not worry about them for today!>
 ```
