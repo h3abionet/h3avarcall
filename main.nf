@@ -19,6 +19,8 @@ phase1_indels        = file("${resources}/1000G_phase1.indels.b37.vcf", type: 'f
 phase1_snps          = file("${resources}/1000G_phase1.snps.high_confidence.b37.vcf", type: 'file')
 golden_indels        = file("${resources}/Mills_and_1000G_gold_standard.indels.b37.vcf", type: 'file')
 ext                  = "fastq,fastq.gz,fastq.bz2,fq,fq.gz,fq.bz2"
+//bind_dir             = "/" + params.resources.split('/')[1].toString()
+bind_dir             = [params.data, params.out, params.resources].collect { it -> "--bind ${it}:${it}"}.join(" ").toString()
 
 // OUTPUT DIRECTORIES
 out_dir.mkdir()
@@ -184,6 +186,19 @@ if(mode == null || mode == 'do.GetContainers' || mode == 'do.GenomeIndexing' ) {
     exit 1
 }
 
+/*  ======================================================================================================
+ *  RUN INFO
+ *  ======================================================================================================
+ */
+log.info "====================================      "
+log.info "          H3AVarCall                      "
+log.info "===================================="
+log.info "Input data                : ${data_dir}"
+log.info "Output path               : ${out_dir}"
+log.info "GATK-b37-bundle directory : ${resources}"
+log.info "Path to bind              : ${bind_dir} "
+log.info "====================================\n"
+
 // START PROCESSING READS
 switch (mode) {
         // PREPROCESSING - DOWNLOAD THE SINGULARITY IMAGES REQUIRED TO EXECUTE THIS WORKFLOW!
@@ -213,7 +228,7 @@ switch (mode) {
     case['do.GenomeIndexing']:
         process run_GenomeIndexing {
             label 'bwa'
-            tag { sample }
+            tag { "Downloading b37" }
             publishDir "$baseDir/resources", mode: 'copy', overwrite: true
             
             output:
