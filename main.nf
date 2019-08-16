@@ -20,7 +20,7 @@ phase1_snps          = file("${resources}/1000G_phase1.snps.high_confidence.b37.
 golden_indels        = file("${resources}/Mills_and_1000G_gold_standard.indels.b37.vcf", type: 'file')
 ext                  = "fastq,fastq.gz,fastq.bz2,fq,fq.gz,fq.bz2"
 //bind_dir             = "/" + params.resources.split('/')[1].toString()
-bind_dir             = [params.data, params.out, params.resources].collect { it -> "--bind ${it}:${it}"}.join(" ").toString()
+bind_dir             = [params.data, params.out, params.resources].collect { it -> "-B ${it}"}.join(" ").toString()
 
 // OUTPUT DIRECTORIES
 out_dir.mkdir()
