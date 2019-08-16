@@ -189,7 +189,7 @@ switch (mode) {
         // PREPROCESSING - DOWNLOAD THE SINGULARITY IMAGES REQUIRED TO EXECUTE THIS WORKFLOW!
     case['do.GetContainers']:
         base = "shub://h3abionet/h3avarcall:"
-        shub_images = Channel.from( ["${base}gatk", "${base}bwa", "${base}trimmomatic", "${base}fastqc", "${base}multiqc"] )
+        shub_images = Channel.from( ["${base}gatk", "${base}bwa", "${base}trimmomatic", "${base}fastqc"] ) //"${base}multiqc"
         
         process run_DownloadContainers {
             label 'noimage'
@@ -261,7 +261,6 @@ switch (mode) {
             
             output:
             set sample, file("${sample}*{1,2}P*") into read_pairs_trimmed
-            set sample, file("trimlog_${sample}.log") into trim_multiqc
 
             """
             java -jar /opt/Trimmomatic-0.39/trimmomatic-0.39.jar PE \
