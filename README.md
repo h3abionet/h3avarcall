@@ -95,17 +95,23 @@ ln -s /global/blast/gatk-bundle/b37/* .
 
 ## 2. Executing the main `h3avarcall` pipeline
 
-### 2.1. Read QC (optional):
+### 2.1. Read QC (optional): <br/>
+Before getting started with the downstream analysis, it's always good to do some quality checks on your raw sequences to assess the quality of raw sequence data, the fastq files. FastQC tool has been used in this workflow. An html report page will be automatically created for each fastq file. You can load up these html pages in your browser to assess your data through graphs and summary tables.<br/>
+To perform the QC of your fastq files, you can use this command:
 ```bash
 nextflow run main.nf -profile slurm --mode do.QC
 ```
 
-### 2.2. Read Trimming (optional):
+### 2.2. Read Trimming (optional):<br/>
+After performing the QC of your fastq files, you have an idea about the quality of your reads: some of your reads might not be of a very good quality or the quality might drop at some positions (near the begining or end of reads) across all reads and this requires to clean up your library to minimize biaises in your analysis by filtering poor quality reads and/or trim poor quality bases from our samples. Trimmomatic is the trimming tool that has been used here. <br/>
+To run the trimming step, you can use this command:
 ```bash
 nextflow run main.nf -profile slurm --mode do.ReadTrimming
 ```
 
-### 2.3. Read Alignment
+### 2.3. Read Alignment<br/>
+Once you have good raw sequences quality, the next step is to map your reads to a reference genome to determine where in the genome the reads originated from. The mapper used in this workflow is BWA.
+
 Can be run with `--from do.ReadTrimming` or `--from do.QC` depending on whether these step were run! 
 ```bash
 nextflow run main.nf -profile slurm --mode do.ReadAlignment
