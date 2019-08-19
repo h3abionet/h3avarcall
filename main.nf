@@ -81,7 +81,7 @@ if(mode == null || mode == 'do.GetContainers' || mode == 'do.GenomeIndexing' ) {
             .ifEmpty {
             error "$main_data_error"
         }
-    } else if(resume_from == 'do.Trimming') {
+    } else if(resume_from == 'do.ReadTrimming') {
         read_pairs = Channel.fromFilePairs("${trim_dir}/*[1,2]P.{$ext}", type: 'file')
             .ifEmpty {
             error "$trim_data_error"
@@ -123,7 +123,7 @@ if(mode == null || mode == 'do.GetContainers' || mode == 'do.GenomeIndexing' ) {
             .ifEmpty {
             error "$main_data_error"
         }
-    } else if(resume_from == 'do.Trimming') {
+    } else if(resume_from == 'do.ReadTrimming') {
         read_pairs = Channel.fromFilePairs("${trim_dir}/*[1,2]P.{$ext}", type: 'file')
             .ifEmpty {
             error "$trim_data_error"
@@ -133,13 +133,13 @@ if(mode == null || mode == 'do.GetContainers' || mode == 'do.GenomeIndexing' ) {
         println "Ooops!! Looks like there's an ERROR in you command!"
         println "I do not recognise the \'--from ${resume_from}\' option you have given me!"
         println "The allowed options for \'--from\' that can be used with \'--mode ${mode}\' are:"
-        println "\t[ do.QC | do.Trimming ]"
+        println "\t[ do.QC | do.ReadTrimming ]"
         println "Please use one of the above options, or leave the \'--from\' option out, so I can continue!"
         println "=============================================================================================\n"
         exit 1
     }
 } else if(mode == 'do.VariantCalling') {
-    if(resume_from == null || resume_from == 'do.Alignment') {
+    if(resume_from == null || resume_from == 'do.ReadAlignment') {
         bam_recal = Channel.fromFilePairs("${align_dir}/*_md.recal.{bai,bam}")
             .ifEmpty {
             error "$align_data_error"
@@ -149,7 +149,7 @@ if(mode == null || mode == 'do.GetContainers' || mode == 'do.GenomeIndexing' ) {
         println "Ooops!! Looks like there's an ERROR in you command!"
         println "I do not recognise the \'--from ${resume_from}\' option you have given me!"
         println "The allowed options for \'--from\' that can be used with \'--mode ${mode}\' are:"
-        println "\t[ do.Alignment ]"
+        println "\t[ do.ReadAlignment ]"
         println "Please us the above option to resume from the ALIGNMENT STEP!"
         println "=============================================================================================\n"
         exit 1
