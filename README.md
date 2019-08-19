@@ -1,5 +1,5 @@
 # `h3avarcall` - H3ABioNet Variant Calling Pipeline
-`h3avarcall` is an H3ABioNet Variant Calling [```Nextflow```](https://www.nextflow.io/) pipeleline developed for blah blah blah...
+`h3avarcall` is a [```Nextflow```](https://www.nextflow.io/) pipeline developed by [```H3ABioNet```](https://www.h3abionet.org/) for genomic Variant Calling allowing to detect SNPs and Indels giving raw sequence reads (fastq files) as input. `h3avarcall` includes the different steps from aligning raw sequence reads to variant calling and filteringusing using GATK.
 
 ## 1. Obtaining pipeline and preparing Data
 Clone `h3avarcall` repository onto you machine:
