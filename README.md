@@ -1,14 +1,15 @@
 # `h3avarcall` - H3ABioNet Variant Calling Pipeline
 `h3avarcall` is a [```Nextflow```](https://www.nextflow.io/) pipeline developed by [```H3ABioNet```](https://www.h3abionet.org/) for genomic Variant Calling allowing to detect SNPs and Indels giving raw sequence reads (fastq files) as input. `h3avarcall` includes the different steps from aligning raw sequence reads to variant calling and filtering using GATK. <br/>
+For more details about the different steps of the pipeline, check the [H3ABionet SOPs pages] https://h3abionet.github.io/H3ABionet-SOPs/Variant-Calling
 `h3avarcall` is a modular and extensible tool allowing users to run the whole workflow, use only parts of it and also to easily enrich it and adapt it to their needs. `h3avarcall` generates a number of intermediate files where results from various steps of the workflow are stored. 
 
 ## 1. Obtaining pipeline and preparing Data
-Clone `h3avarcall` repository onto you machine:
+First, you need to clone the `h3avarcall` repository onto you machine:
 ```bash
 git clone https://github.com/h3abionet/h3avarcall.git
 cd h3avarcall
 ```
-Contents of the repository:
+Content of the repository:
 ```bash
 h3avarcall
   |--containers                       ## Folder for Singularity images and recipes (in case you want to build yourself). All downloaded images go here!
@@ -58,12 +59,12 @@ params {
 ```
 
 ### 1.1. Download test datasets:
-Create a data directory within the `h3avarcall` repository:
+Create a data directory under the `h3avarcall` repository:
 ```bash
 mkdir data
 cd data
 ```
-Download the test data from [THIS_SITE](http://thesite.com):
+Download the test data from [THIS_SITE](http://thesite.com) using one of the commands bellow:
 #### 1.1.2. Using LFTP (faster)
 ```bash
 lftp -e "pget -n 20 ftp://ftp-trace.ncbi.nih.gov/giab/ftp/data/NA12878/Garvan_NA12878_HG001_HiSeq_Exome/NIST7035_TAAGGCGA_L001_R1_001.fastq.gz; bye"
@@ -76,12 +77,12 @@ wget ftp://ftp-trace.ncbi.nih.gov/giab/ftp/data/NA12878/Garvan_NA12878_HG001_HiS
 wget ftp://ftp-trace.ncbi.nih.gov/giab/ftp/data/NA12878/Garvan_NA12878_HG001_HiSeq_Exome/NIST7035_TAAGGCGA_L001_R2_001.fastq.gz
 ```
 
-### 1.2. Download the `Singularity` containers required to execute the pipeline:
+### 1.2. Download the `Singularity` containers (required to execute the pipeline):
 ```bash
 nextflow run main.nf -profile slurm --mode do.GetContainers
 ```
 
-### 1.3. Download the GATK b37 bundle required to execute the workflow:
+### 1.3. Download the GATK b37 bundle (required to execute the pipeline):
 This step takes **FOREVER** to run - run it only once!
 
 ```bash
@@ -104,16 +105,16 @@ nextflow run main.nf -profile slurm --mode do.QC
 
 ### 2.2. Read Trimming (optional):<br/>
 After performing the QC of your fastq files, you have an idea about the quality of your reads: some of your reads might not be of a very good quality or the quality might drop at some positions (near the begining or end of reads) across all reads and this requires to clean up your library to minimize biaises in your analysis by filtering poor quality reads and/or trim poor quality bases from our samples. Trimmomatic is the trimming tool that has been used here. <br/>
-For more information about reads preprocessing, check the [H3ABionet SOPs pages](https://h3abionet.github.io/H3ABionet-SOPs/Variant-Calling#phase-1-preprocessing-of-the-raw-reads). <br/>
+For more information about reads preprocessing, check this [page](https://h3abionet.github.io/H3ABionet-SOPs/Variant-Calling#phase-1-preprocessing-of-the-raw-reads). <br/>
 To run the trimming step of the `h3avarcall` pipeline, you can use this command:
 ```bash
 nextflow run main.nf -profile slurm --mode do.ReadTrimming
 ```
 
 ### 2.3. Read Alignment<br/>
-Once you have good raw sequences quality, the next step is to map your reads to a reference genome to determine where in the genome the reads originated from. The mapper used in this workflow is BWA.
+Once you have good raw sequences quality, the next step is to map your reads to a reference genome to determine where in the genome the reads originated from. The mapper used in this workflow is BWA. 
 
-Can be run with `--from do.ReadTrimming` or `--from do.QC` depending on whether these step were run! 
+Can be run with `--from do.ReadTrimming` or `--from do.QC` depending on whether these steps were run! 
 ```bash
 nextflow run main.nf -profile slurm --mode do.ReadAlignment
 ```
@@ -134,8 +135,8 @@ Depends on at lease ONE step of the workflow to be executed!
 nextflow run main.nf -profile slurm --mode do.MultiQC 
 ```
 
-## 3. `h3avarcall` results
-Assuming the output folder was left as default (in the `main.config` file), the results for running the `h3avarcall` will be found in the `results` folder of the `h3avarcall` repository. The results for each of the main workflow steps (`2.1` - `2.5`) are grouped as follows:
+## 3. Explore `h3avarcall` results
+Assuming you did not change the  default output folder (in the `main.config` file), the resulting files will be found in the `results` folder of the `h3avarcall` repository. Resulting files for each of the main pipeline steps (`2.1` - `2.5`) are grouped in different folders as follows:
 ```
 - [1] Read QC (optional)         =>    `results/1_QC`
 - [2] Read Trimming (optional)   =>    `results/2_Read_Trimming`
@@ -145,7 +146,8 @@ Assuming the output folder was left as default (in the `main.config` file), the 
 - [6] MultiQC                    =>    `results/MultiQC`
 ```
 
-Nested withing these results folders are ouput files from each step of the workflow, including a folder "`workflow_report`" containing `h3avarcall_report.html`, `h3avarcall_timeline.html`, `h3avarcall_workflow.dot` and `h3avarcall_trace.txt` that contain detailed information on the resources (CPU, MEMORY and TIME) usage of each process in the steps. The `results` directory structure within `h3avarcall` repository can be summarized as below:
+In each of these folders, a sub-folder "`workflow_report`"  is created. It  contains 4 different files (`h3avarcall_report.html`, `h3avarcall_timeline.html`, `h3avarcall_workflow.dot` and `h3avarcall_trace.txt`) containing detailed information on the resources (CPU, MEMORY and TIME) usage of each process in the different pipeline steps. <br/> 
+The `results` directory structure within `h3avarcall` repository can be summarized as below:
 
 ```bash
 h3avarcall
@@ -196,4 +198,4 @@ h3avarcall
   |--work
   |  |--<There's a lot of folders here! Lets not worry about them for today!>
 ```
-##MORE TO BE ADDED
+##We're working on further improving the pipleine and the associated documentation, feel free to share comments and suggestions!
