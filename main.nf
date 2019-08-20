@@ -204,7 +204,7 @@ switch (mode) {
         // PREPROCESSING - DOWNLOAD THE SINGULARITY IMAGES REQUIRED TO EXECUTE THIS WORKFLOW!
     case['do.GetContainers']:
         base = "shub://h3abionet/h3avarcall:"
-        shub_images = Channel.from( ["${base}gatk", "${base}bwa", "${base}trimmomatic", "${base}fastqc"] ) //"${base}multiqc"
+        shub_images = Channel.from( ["${base}gatk", "${base}bwa", "${base}trimmomatic", "${base}fastqc"] ) 
         
         process run_DownloadContainers {
             label 'noimage'
@@ -566,7 +566,7 @@ switch (mode) {
             -resource:mills,known=false,training=true,truth=true,prior=12.0 ${golden_indels} \
             -resource:dbsnp,known=true,training=false,truth=false,prior=2.0 ${dbsnp_sites} \
             -an DP -an FS -an SOR -an MQ -an MQRankSum -an QD -an ReadPosRankSum \
-            -mode INDEL --max-gaussians 4 \
+            -mode INDEL --max-gaussians 2 \
             -V ${list_vcf.find { it =~ 'vcf.gz$' } } \
             -O genome.recal-SNP.recal-INDEL.recal \
             --tranches-file genome.recal-SNP.recal-INDEL.tranches
@@ -600,6 +600,7 @@ switch (mode) {
         
     case['do.MultiQC']:
         process run_MultiQC {
+            label 'multiqc'
             tag { sample }
             publishDir "${multi_qc_dir}", mode: 'copy', overwrite: true
             
