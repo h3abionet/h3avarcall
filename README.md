@@ -63,7 +63,7 @@ Create a data directory within the `h3avarcall` repository:
 mkdir data
 cd data
 ```
-Download the test data from [THE_SITE](http://thesite.com):
+Download the test data from [THIS_SITE](http://thesite.com):
 #### 1.1.2. Using LFTP (faster)
 ```bash
 lftp -e "pget -n 20 ftp://ftp-trace.ncbi.nih.gov/giab/ftp/data/NA12878/Garvan_NA12878_HG001_HiSeq_Exome/NIST7035_TAAGGCGA_L001_R1_001.fastq.gz; bye"
@@ -104,7 +104,8 @@ nextflow run main.nf -profile slurm --mode do.QC
 
 ### 2.2. Read Trimming (optional):<br/>
 After performing the QC of your fastq files, you have an idea about the quality of your reads: some of your reads might not be of a very good quality or the quality might drop at some positions (near the begining or end of reads) across all reads and this requires to clean up your library to minimize biaises in your analysis by filtering poor quality reads and/or trim poor quality bases from our samples. Trimmomatic is the trimming tool that has been used here. <br/>
-To run the trimming step, you can use this command:
+For more information about reads preprocessing, check the [H3ABionet SOPs pages](https://h3abionet.github.io/H3ABionet-SOPs/Variant-Calling#phase-1-preprocessing-of-the-raw-reads). <br/>
+To run the trimming step of the `h3avarcall` pipeline, you can use this command:
 ```bash
 nextflow run main.nf -profile slurm --mode do.ReadTrimming
 ```
