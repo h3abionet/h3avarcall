@@ -396,7 +396,7 @@ switch (mode) {
 
         // MAIN WORKFLOW - STEP 4 (COMPULSORY): VARIANT CALLING ON ALIGNED/MARKDUPLICATE/RECALIBRATED BAM FILES
     case['do.VariantCalling']:
-        chromosomes = Channel.from ( 2..3 )
+        chromosomes = Channel.from ( 22 )
         process run_HaplotypeCaller {
             label 'gatk'
             tag { "${sample}_chr_${chrom}" }
